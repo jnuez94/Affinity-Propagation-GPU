@@ -1,5 +1,5 @@
 import numpy as np
-import utility.py as ut
+import utility as ut
 
 """
 Python version of apclusterSparse.m
@@ -7,31 +7,31 @@ utility.py reads data and generates float32 numpy array of coordinates
 Sparse similarity matrix is generated here
 """
 # Read point cloud
-data = utility.readPointCloud('.xyz')
+data = np.array(ut.readPointCloud('../data/short.xyz'))
 if np.size(data, 0) != 3: print 'Data should be a 3D point cloud'
 if data.dtype != np.float32: print 'Data needs to be float32'
 # Generate sparse similarity matrix
 N = data.shape[1]
 M = N*N-N
 s = np.zeros((3,M), np.float32)
-j = 1
+j = 0
 for i in range(N):
     for k in range(N):
         if k == i: continue
         s[0][j] = i
         s[1][j] = k
-        s[2][j] = -np.sum(np.square(data[:][i] - data[:][k]))
+        s[2][j] = -np.sum(np.square(data[:,i] - data[:,k]))
         j += 1
 # Set preference to median similarity
-p = np.median(s[2][:]).astype(np.float32)
+p = np.median(s[2,:]).astype(np.float32)
 
 #PARAMETERS
 #defaults for now
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
-DAMPFACT = 0.9.astype(np.float32) # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
+DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
 PLT = False # Plots net similarity after each iteration
-DETAILS = False # Store idx, netsim, dpsim, expref after each iteration
+DETAILS = True # Store idx, netsim, dpsim, expref after each iteration
 NONOISE = False # Degenerate input similarities. True = noise removal.
 if DAMPFACT>0.9:
     print 'Large damping factor, turn on plotting! Consider using larger value of convits.'
@@ -44,44 +44,44 @@ if DAMPFACT>0.9:
 if np.size(p) == 1: p = p*np.ones(N, np.float32)
 
 # Append self-similarities (preferences) to s-matrix
-tmps = np.vstack((np.tile(range(1,N+1), (2,1)), p)).astype(np.float32)
-s = np.vstack((s, tmps))
+tmps = np.vstack((np.tile(range(N), (2,1)), p)).astype(np.float32)
+s = np.hstack((s, tmps))
 
 # Add a small amount of noise to input similarities
 if not NONOISE:
     np.random.seed()
-    s[2][:] += np.multiply(np.finfo('float32').eps * s[2][:] + np.finfo('float32').tiny * 100 , np.random.rand(M))
+    s[2,0:M] += np.multiply(np.finfo('float32').eps * s[2,0:M] + np.finfo('float32').tiny * 100 , np.random.rand(M))
 
 # Construct indices of neighbors
-ind1e = np.zeros(N, np.float32)
+ind1e = np.zeros(N, np.int32)
 for j in range(M):
-    k = s[0][j]
+    k = int(s[0,j])
     ind1e[k] += 1
-ind1e = np.cumsum(ind1e).astype(np.float32)
-ind1s = np.concatenate((np.ones(1, np.float32), ind1e[0:-1] + 1))
-ind1 = np.zeros(M, np.float32)
+ind1e = np.cumsum(ind1e)
+ind1s = np.concatenate((np.zeros(1, np.int32), ind1e[0:-1]))
+ind1 = np.zeros(M, np.int32)
 for j in range(M):
-    k = s[0][j]
+    k = int(s[0,j])
     ind1[ind1s[k]] = j
     ind1s[k] += 1
-ind1s = np.concatenate((np.ones(1, np.float32), ind1e[0:-1] + 1))
-ind2e = np.zeros(N, np.float32)
+ind1s = np.concatenate((np.zeros(1, np.int32), ind1e[0:-1]))
+ind2e = np.zeros(N, np.int32)
 for j in range(M):
-    k = s[1][j]
+    k = int(s[1,j])
     ind2e[k] += 1
-ind2e = np.cumsum(ind2e).astype(np.float32)
-ind2s = np.concatenate((np.ones(1, np.float32), ind2e[0:-1] + 1))
-ind2 = np.zeros(M, np.float32)
+ind2e = np.cumsum(ind2e).astype(np.int32)
+ind2s = np.concatenate((np.zeros(1, np.int32), ind2e[0:-1]))
+ind2 = np.zeros(M, np.int32)
 for j in range(M):
-    k = s[1][j]
-    ind2[ind2[k]] = j
+    k = int(s[1,j])
+    ind2[ind2s[k]] = j
     ind2s[k] += 1
-ind2s = np.concatenate((np.ones(1, np.float32), ind2s[0:-1] + 1))
+ind2s = np.concatenate((np.zeros(1, np.int32), ind2e[0:-1]))
 
 # Allocate space for messages
 A = np.zeros(M, np.float32)
 R = np.zeros(M, np.float32)
-t = 1
+#t = 1
 if PLT: netsim = np.zeros(MAXITS+1, np.float32)
 if DETAILS:
     idx = np.zeros((MAXITS+1, N), np.float32)
@@ -92,13 +92,13 @@ if DETAILS:
 # Execute parallel affinity propagation updates
 e = np.zeros((CONVITS, N), np.float32)
 dn = 0
-i = 0
+i = -1
 while not dn:
-    #i += 1
+    i += 1
 
     # Compute responsibilities
     for j in range(N):
-        ss = s[2][ind1[ind1s[j]] : ind1e[j]]
+        ss = s[2 , ind1[ind1s[j]] : ind1e[j]]
         a_s = A[ind1[ind1s[j]] : ind1e[j]] + ss
         Y = np.max(a_s).astype(np.float32)
         I = np.argmax(a_s)
@@ -107,8 +107,8 @@ while not dn:
         I2 = np.argmax(a_s)
         r = ss - Y
         r[I] = ss[I] - Y2
-        R[ind1[ind2s[j] : ind1e[j]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]
-
+        R[ind1[ind1s[j] : ind1e[j]]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]
+    print R[M-N::]
     # Compute availabilities
     for j in range(N):
         rp = R[ind2[ind2s[j] : ind2e[j]]]
@@ -116,33 +116,33 @@ while not dn:
         a = np.sum(rp) - rp
         a[0:-1] = np.min(a[0:-1])
         A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]]
-
+    print A[M-N::]
     # Check for convergence
     E = (A[M-N::] + R[M-N::]) > 0
-    e[(i-1) % CONVITS][:] = E
+    e[(i-1) % CONVITS , :] = E
     K = np.sum(E).astype(np.float32)
-    if i >= CONVITS or i>= MAXITS:
+    if i >= CONVITS-1 or i>= MAXITS-1:
         se = np.sum(e, 0).astype(np.float32)
         unconverged = np.sum((se==CONVITS) + (se==0)) != N
-        if (not unconverged and K>0) or (i==MAXITS):
+        if (not unconverged and K>0) or (i==MAXITS-1):
             dn=1
 
     # Handle plotting and storage of details, if requested
     if PLT or DETAILS:
         if K==0:
-            tmptnetsim = float('nan')
+            tmpnetsim = float('nan')
             tmpdpsim = float('nan')
             tmpexpref = float('nan')
             tmpidx = float('nan')
         else:
-            tmpidx = np.zeros(N))
+            tmpidx = np.zeros(N)
             tmpdpsim = 0
-            tmpidx[np.argwhere(E)] = np.argwhere[E]
-            tmpexpref = np.sum(p[np.argwhere[E]])
+            tmpidx[np.argwhere(E)] = np.argwhere(E)
+            tmpexpref = np.sum(p[np.argwhere(E)])
             discon = 0
-            for j in np.argwhere(E==0):
-                ss = s[2][ind1[ind1s[j] : ind1e[j]]]
-                ii = s[1][ind1[ind1s[j] : ind1e[j]]]
+            for j in np.argwhere(E==0).flatten():
+                ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
+                ii = s[1 , ind1[ind1s[j] : ind1e[j]]].astype(np.int32)
                 ee = np.argwhere(E[ii])
                 if np.size(ee) == 0:
                     discon = 1
@@ -162,7 +162,7 @@ while not dn:
         netsim[i] = tmpnetsim
         dpsim[i] = tmpdpsim
         expref[i] = tmpexpref
-        idx[i][:] = tmpidx
+        idx[i,:] = tmpidx
     if PLT:
         netsim[i] = tmpnetsim
         import matplotlib as mpl
@@ -175,7 +175,9 @@ while not dn:
         plt.xlabel('# Iterations')
         plt.ylabel('Net similarity of quantized intermediate solution')
 
-    i += 1
+    #i += 1
+
+print i
 
 # Identify exemplars
 E = ((A[M-N:M] + R[M-N:M]) > 0)
@@ -183,23 +185,23 @@ K = np.sum(E).astype(np.float32)
 if K>0:
     tmpidx=np.zeros(N, np.float32)
     tmpidx[np.argwhere(E)] = np.argwhere(E)
-    for j in np.argwhere(E==0):
-        ss = s[2][ind1[ind1s[j] : ind1e[j]]]
-        ii = s[1][ind1[ind1s[j] : ind1e[j]]]
+    for j in np.argwhere(E==0).flatten():
+        ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
+        ii = s[1 , ind1[ind1s[j] : ind1e[j]]]
         ee = np.argwhere(E[ii])
         #smx = np.max(ss[ee])
         imx = np.argmax(ss[ee])
         tmpidx[j] = ii[ee[imx]]
     EE = np.zeros(N, np.float32)
-    for j in np.argwhere(E):
+    for j in np.argwhere(E).flatten():
         jj = np.argwhere(tmpidx==0)
         mx = float('-Inf')
         ns = np.zeros(N, np.float32)
         msk = np.zers(N, np.float32)
         for m in jj:
-            mm = s[1][ind1[ind1s[m] : ind1e[m]]]
+            mm = s[1 , ind1[ind1s[m] : ind1e[m]]]
             msk[mm] += 1
-            ns[mm] += s[2][ind1[ind1s[m] : ind1e[m]]]
+            ns[mm] += s[2 , ind1[ind1s[m] : ind1e[m]]]
         ii = jj[np.argwhere(msk[jj]) == np.size(jj)]
         #smx = np.max(ns[ii])
         imx = np.argmax(ns[ii])
@@ -209,9 +211,9 @@ if K>0:
     tmpdpsim = 0
     tmpidx[np.argwhere(E)] = np.argwhere(E)
     tmpexpref = np.sum(p[np.argwhere(E)])
-    for j in np.argwhere(E==0):
-        ss = s[2][ind1[ind1s[j] : ind1e[j]]]
-        ii = s[1][ind1[ind1s[j] : ind1e[j]]]
+    for j in np.argwhere(E==0).flatten():
+        ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
+        ii = s[1 , ind1[ind1s[j] : ind1e[j]]]
         ee = np.argwhere(E[ii])
         smx = np.max(ss[ee])
         imx = np.argmax(ss[ee])
@@ -229,8 +231,8 @@ if DETAILS:
     dpsim = dpsim[0:i+1]
     expref[i+1] = tmpexpref
     expref = expref[0:i+1]
-    idx[i+1][:] = tmpidx
-    idx = idx[0:i+1][:]
+    idx[i+1 , :] = tmpidx
+    idx = idx[0:i+1 , :]
 else:
     netsim = tmpnetsim
     dpsim = tmpnetsim - tmpexpref
@@ -239,9 +241,9 @@ else:
 if PLT or DETAILS:
     print '\nNumber of identified clusters: %d\n' % K
     print 'Fitness (net similarity): %f\n' % tmpnetsim
-    print '  Similarities of data points to exemplars: %f\n' % dpsim(end)
+    print '  Similarities of data points to exemplars: %f\n' % dpsim[i]
     print '  Preferences of selected exemplars: %f\n' % tmpexpref
-    print 'Number of iterations: %d\n\n' % i
+    print 'Number of iterations: %d\n\n' % (i+1)
 if unconverged:
     print '\n*** Warning: Algorithm did not converge. The similarities\n'
     print '    may contain degeneracies - add noise to the similarities\n'
