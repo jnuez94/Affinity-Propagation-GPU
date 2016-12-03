@@ -41,21 +41,23 @@ if DAMPFACT>0.9:
 ########################
 
 # Make vector of preferences
-if np.size(p, 0) == 1: p = p*np.ones(N, np.float32)
+if np.size(p) == 1: p = p*np.ones(N, np.float32)
 
 # Append self-similarities (preferences) to s-matrix
 tmps = np.vstack((np.tile(range(1,N+1), (2,1)), p)).astype(np.float32)
 s = np.vstack((s, tmps))
 
 # Add a small amount of noise to input similarities
-# TODO: figure out how do do the randomness
+if not NONOISE:
+    np.random.seed()
+    s[2][:] += np.multiply(np.finfo('float32').eps * s[2][:] + np.finfo('float32').tiny * 100 , np.random.rand(M))
 
 # Construct indices of neighbors
 ind1e = np.zeros(N, np.float32)
 for j in range(M):
     k = s[0][j]
     ind1e[k] += 1
-ind1e = np.cumsum(ind1e)
+ind1e = np.cumsum(ind1e).astype(np.float32)
 ind1s = np.concatenate((np.ones(1, np.float32), ind1e[0:-1] + 1))
 ind1 = np.zeros(M, np.float32)
 for j in range(M):
@@ -67,7 +69,7 @@ ind2e = np.zeros(N, np.float32)
 for j in range(M):
     k = s[1][j]
     ind2e[k] += 1
-ind2e = np.cumsum(ind2e)
+ind2e = np.cumsum(ind2e).astype(np.float32)
 ind2s = np.concatenate((np.ones(1, np.float32), ind2e[0:-1] + 1))
 ind2 = np.zeros(M, np.float32)
 for j in range(M):
@@ -80,12 +82,12 @@ ind2s = np.concatenate((np.ones(1, np.float32), ind2s[0:-1] + 1))
 A = np.zeros(M, np.float32)
 R = np.zeros(M, np.float32)
 t = 1
-if PLT: netsim = np.zeros((MAXITS+1, 1), np.float32)
+if PLT: netsim = np.zeros(MAXITS+1, np.float32)
 if DETAILS:
     idx = np.zeros((MAXITS+1, N), np.float32)
-    netsim = np.zeros((MAXITS+1, 1), np.float32)
-    dpsim = np.zeros((MAXITS+1, 1), np.float32)
-    expref = np.zeros((MAXITS+1, 1), np.float32)
+    netsim = np.zeros(MAXITS+1, np.float32)
+    dpsim = np.zeros(MAXITS+1, np.float32)
+    expref = np.zeros(MAXITS+1, np.float32)
 
 # Execute parallel affinity propagation updates
 e = np.zeros((CONVITS, N), np.float32)
@@ -103,7 +105,7 @@ while not dn:
         a_s[I] = -np.finfo('float32').min
         Y2 = np.max(a_s).astype(np.float32)
         I2 = np.argmax(a_s)
-        r = ss-Y
+        r = ss - Y
         r[I] = ss[I] - Y2
         R[ind1[ind2s[j] : ind1e[j]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]
 
@@ -177,33 +179,33 @@ while not dn:
 
 # Identify exemplars
 E = ((A[M-N:M] + R[M-N:M]) > 0)
-K = np.sum(E)
+K = np.sum(E).astype(np.float32)
 if K>0:
-    tmpidx=np.zeros(N)
+    tmpidx=np.zeros(N, np.float32)
     tmpidx[np.argwhere(E)] = np.argwhere(E)
     for j in np.argwhere(E==0):
         ss = s[2][ind1[ind1s[j] : ind1e[j]]]
         ii = s[1][ind1[ind1s[j] : ind1e[j]]]
         ee = np.argwhere(E[ii])
-        smx = np.max(ss[ee])
+        #smx = np.max(ss[ee])
         imx = np.argmax(ss[ee])
         tmpidx[j] = ii[ee[imx]]
-    EE = np.zeros(N)
+    EE = np.zeros(N, np.float32)
     for j in np.argwhere(E):
         jj = np.argwhere(tmpidx==0)
         mx = float('-Inf')
-        ns = np.zeros(N)
-        msk = np.zers(N)
+        ns = np.zeros(N, np.float32)
+        msk = np.zers(N, np.float32)
         for m in jj:
             mm = s[1][ind1[ind1s[m] : ind1e[m]]]
             msk[mm] += 1
             ns[mm] += s[2][ind1[ind1s[m] : ind1e[m]]]
         ii = jj[np.argwhere(msk[jj]) == np.size(jj)]
-        smx = np.max(ns[ii])
+        #smx = np.max(ns[ii])
         imx = np.argmax(ns[ii])
         EE[ii[imx]] = 1
     E = EE
-    tmpidx = np.zeros(N)
+    tmpidx = np.zeros(N, np.float32)
     tmpdpsim = 0
     tmpidx[np.argwhere(E)] = np.argwhere(E)
     tmpexpref = np.sum(p[np.argwhere(E)])
