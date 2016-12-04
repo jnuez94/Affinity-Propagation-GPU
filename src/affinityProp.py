@@ -32,7 +32,7 @@ CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Def
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
 PLT = False # Plots net similarity after each iteration
 DETAILS = True # Store idx, netsim, dpsim, expref after each iteration
-NONOISE = False # Degenerate input similarities. True = noise removal.
+NONOISE = True # Degenerate input similarities. True = noise removal.
 if DAMPFACT>0.9:
     print 'Large damping factor, turn on plotting! Consider using larger value of convits.'
 
@@ -46,6 +46,7 @@ if np.size(p) == 1: p = p*np.ones(N, np.float32)
 # Append self-similarities (preferences) to s-matrix
 tmps = np.vstack((np.tile(range(N), (2,1)), p)).astype(np.float32)
 s = np.hstack((s, tmps))
+M = np.shape(s)[1]
 
 # Add a small amount of noise to input similarities
 if not NONOISE:
@@ -57,7 +58,7 @@ ind1e = np.zeros(N, np.int32)
 for j in range(M):
     k = int(s[0,j])
     ind1e[k] += 1
-ind1e = np.cumsum(ind1e)
+ind1e = np.cumsum(ind1e).astype(np.int32)
 ind1s = np.concatenate((np.zeros(1, np.int32), ind1e[0:-1]))
 ind1 = np.zeros(M, np.int32)
 for j in range(M):
@@ -98,17 +99,17 @@ while not dn:
 
     # Compute responsibilities
     for j in range(N):
-        ss = s[2 , ind1[ind1s[j]] : ind1e[j]]
-        a_s = A[ind1[ind1s[j]] : ind1e[j]] + ss
+        ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
+        a_s = A[ind1[ind1s[j] : ind1e[j]]] + ss
         Y = np.max(a_s).astype(np.float32)
         I = np.argmax(a_s)
-        a_s[I] = -np.finfo('float32').min
+        a_s[I] = np.finfo('float32').min
         Y2 = np.max(a_s).astype(np.float32)
         I2 = np.argmax(a_s)
         r = ss - Y
         r[I] = ss[I] - Y2
         R[ind1[ind1s[j] : ind1e[j]]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]
-    print R[M-N::]
+
     # Compute availabilities
     for j in range(N):
         rp = R[ind2[ind2s[j] : ind2e[j]]]
@@ -116,9 +117,10 @@ while not dn:
         a = np.sum(rp) - rp
         a[0:-1] = np.min(a[0:-1])
         A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]]
-    print A[M-N::]
+
     # Check for convergence
     E = (A[M-N::] + R[M-N::]) > 0
+    print np.sum(E)
     e[(i-1) % CONVITS , :] = E
     K = np.sum(E).astype(np.float32)
     if i >= CONVITS-1 or i>= MAXITS-1:
@@ -177,32 +179,30 @@ while not dn:
 
     #i += 1
 
-print i
-
 # Identify exemplars
 E = ((A[M-N:M] + R[M-N:M]) > 0)
-K = np.sum(E).astype(np.float32)
+K = np.sum(E).astype(np.int32)
 if K>0:
     tmpidx=np.zeros(N, np.float32)
     tmpidx[np.argwhere(E)] = np.argwhere(E)
     for j in np.argwhere(E==0).flatten():
         ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
-        ii = s[1 , ind1[ind1s[j] : ind1e[j]]]
+        ii = s[1 , ind1[ind1s[j] : ind1e[j]]].astype(np.int32)
         ee = np.argwhere(E[ii])
         #smx = np.max(ss[ee])
         imx = np.argmax(ss[ee])
         tmpidx[j] = ii[ee[imx]]
     EE = np.zeros(N, np.float32)
     for j in np.argwhere(E).flatten():
-        jj = np.argwhere(tmpidx==0)
+        jj = np.argwhere(tmpidx==j).flatten()
         mx = float('-Inf')
         ns = np.zeros(N, np.float32)
-        msk = np.zers(N, np.float32)
+        msk = np.zeros(N, np.float32)
         for m in jj:
-            mm = s[1 , ind1[ind1s[m] : ind1e[m]]]
+            mm = s[1 , ind1[ind1s[m] : ind1e[m]]].astype(np.int32)
             msk[mm] += 1
             ns[mm] += s[2 , ind1[ind1s[m] : ind1e[m]]]
-        ii = jj[np.argwhere(msk[jj]) == np.size(jj)]
+        ii = jj[np.argwhere(msk[jj] == np.size(jj))]
         #smx = np.max(ns[ii])
         imx = np.argmax(ns[ii])
         EE[ii[imx]] = 1
@@ -213,7 +213,7 @@ if K>0:
     tmpexpref = np.sum(p[np.argwhere(E)])
     for j in np.argwhere(E==0).flatten():
         ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
-        ii = s[1 , ind1[ind1s[j] : ind1e[j]]]
+        ii = s[1 , ind1[ind1s[j] : ind1e[j]]].astype(np.int32)
         ee = np.argwhere(E[ii])
         smx = np.max(ss[ee])
         imx = np.argmax(ss[ee])

@@ -28,7 +28,7 @@
 % APCLUSTER automatically determines the number of clusters,
 % based on the input p, which is an Nx1 matrix of real numbers
 % called preferences. p(i) indicates the preference that data
-% point i be chosen as a cluster center. A good choice is to 
+% point i be chosen as a cluster center. A good choice is to
 % set all preference values to the median of the similarity
 % values. The number of identified clusters can be increased or
 % decreased  by changing this value accordingly. If p is a
@@ -68,15 +68,15 @@
 % for i=unique(idx)'
 %   ii=find(idx==i); h=plot(x(ii,1),x(ii,2),'o'); hold on;
 %   col=rand(1,3); set(h,'Color',col,'MarkerFaceColor',col);
-%   xi1=x(i,1)*ones(size(ii)); xi2=x(i,2)*ones(size(ii)); 
+%   xi1=x(i,1)*ones(size(ii)); xi2=x(i,2)*ones(size(ii));
 %   line([x(ii,1),xi1]',[x(ii,2),xi2]','Color',col);
 % end;
 % axis equal tight;
 %
 % PARAMETERS
-% 
+%
 % [idx,netsim,dpsim,expref]=apclusterSparse(s,p,'NAME',VALUE,...)
-% 
+%
 % The following parameters can be set by providing name-value
 % pairs, eg, apcluster(s,p,'maxits',1000):
 %
@@ -190,12 +190,12 @@ end;
 % Construct indices of neighbors
 ind1e=zeros(N,1);
 for j=1:M k=s(j,1); ind1e(k)=ind1e(k)+1; end;
-ind1e=cumsum(ind1e); ind1s=[1;ind1e(1:end-1)+1]; ind1=zeros(M,1); 
+ind1e=cumsum(ind1e); ind1s=[1;ind1e(1:end-1)+1]; ind1=zeros(M,1);
 for j=1:M k=s(j,1); ind1(ind1s(k))=j; ind1s(k)=ind1s(k)+1; end;
 ind1s=[1;ind1e(1:end-1)+1];
 ind2e=zeros(N,1);
 for j=1:M k=s(j,2); ind2e(k)=ind2e(k)+1; end;
-ind2e=cumsum(ind2e); ind2s=[1;ind2e(1:end-1)+1]; ind2=zeros(M,1); 
+ind2e=cumsum(ind2e); ind2s=[1;ind2e(1:end-1)+1]; ind2=zeros(M,1);
 for j=1:M k=s(j,2); ind2(ind2s(k))=j; ind2s(k)=ind2s(k)+1; end;
 ind2s=[1;ind2e(1:end-1)+1];
 
@@ -204,15 +204,15 @@ A=zeros(M,1); R=zeros(M,1); t=1;
 if plt netsim=zeros(1,maxits+1); end;
 if details
     idx=zeros(N,maxits+1);
-    netsim=zeros(1,maxits+1); 
-    dpsim=zeros(1,maxits+1); 
-    expref=zeros(1,maxits+1); 
+    netsim=zeros(1,maxits+1);
+    dpsim=zeros(1,maxits+1);
+    expref=zeros(1,maxits+1);
 end;
 
 % Execute parallel affinity propagation updates
 e=zeros(N,convits); dn=0; i=0;
 while ~dn
-    i=i+1; 
+    i=i+1;
 
     % Compute responsibilities
     for j=1:N
@@ -236,6 +236,7 @@ while ~dn
 
     % Check for convergence
     E=((A(M-N+1:M)+R(M-N+1:M))>0); e(:,mod(i-1,convits)+1)=E; K=sum(E);
+    sum(E)
     if i>=convits || i>=maxits
         se=sum(e,2);
         unconverged=(sum((se==convits)+(se==0))~=N);
@@ -273,7 +274,7 @@ while ~dn
     end;
     if plt
         netsim(i)=tmpnetsim;
-        figure(234); 
+        figure(234);
         tmp=1:i; tmpi=find(~isnan(netsim(1:i)));
         plot(tmp(tmpi),netsim(tmpi),'r-');
         xlabel('# Iterations');
