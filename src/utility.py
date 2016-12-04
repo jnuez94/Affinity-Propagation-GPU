@@ -19,3 +19,11 @@ def readPointCloud(filename):
 	z = np.copy(z).astype(np.float32)
 	return x, y, z
 
+def pysimilarity(x, y, z):
+	size = len(x)
+	sim = np.zeros((size,size), np.float32)
+	for i in xrange(0, size, 1):
+		for j in xrange(0, size, 1):
+			sim[i][j] = -((x[i]-x[j])**2 + (y[i]-y[j])**2 + (z[i]-z[j])**2)
+
+	return sim
