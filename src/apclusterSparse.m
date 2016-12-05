@@ -236,7 +236,7 @@ while ~dn
 
     % Check for convergence
     E=((A(M-N+1:M)+R(M-N+1:M))>0); e(:,mod(i-1,convits)+1)=E; K=sum(E);
-    sum(E)
+    %sum(E)
     if i>=convits || i>=maxits
         se=sum(e,2);
         unconverged=(sum((se==convits)+(se==0))~=N);

@@ -1,5 +1,6 @@
 import numpy as np
 import utility as ut
+np.set_printoptions(threshold = np.inf) # To print the full array
 
 """
 Python version of apclusterSparse.m
@@ -82,7 +83,7 @@ ind2s = np.concatenate((np.zeros(1, np.int32), ind2e[0:-1]))
 # Allocate space for messages
 A = np.zeros(M, np.float32)
 R = np.zeros(M, np.float32)
-#t = 1
+t = 1
 if PLT: netsim = np.zeros(MAXITS+1, np.float32)
 if DETAILS:
     idx = np.zeros((MAXITS+1, N), np.float32)
@@ -91,9 +92,9 @@ if DETAILS:
     expref = np.zeros(MAXITS+1, np.float32)
 
 # Execute parallel affinity propagation updates
-e = np.zeros((CONVITS, N), np.float32)
+e = np.zeros((CONVITS, N), np.int32)
 dn = 0
-i = -1
+i = 0
 while not dn:
     i += 1
 
@@ -113,20 +114,20 @@ while not dn:
     # Compute availabilities
     for j in range(N):
         rp = R[ind2[ind2s[j] : ind2e[j]]]
-        rp[0:-1] = np.max(rp[0:-1])
+        rp[0:-1] = np.maximum(rp[0:-1], 0) # elementwise maximum!
         a = np.sum(rp) - rp
-        a[0:-1] = np.min(a[0:-1])
+        a[0:-1] = np.minimum(a[0:-1], 0) # elementwise minimum!
         A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]]
 
     # Check for convergence
     E = (A[M-N::] + R[M-N::]) > 0
-    print np.sum(E)
+    #print np.sum(E)
     e[(i-1) % CONVITS , :] = E
-    K = np.sum(E).astype(np.float32)
-    if i >= CONVITS-1 or i>= MAXITS-1:
-        se = np.sum(e, 0).astype(np.float32)
+    K = np.sum(E).astype(np.int32)
+    if i >= CONVITS or i>= MAXITS:
+        se = np.sum(e, 0).astype(np.int32)
         unconverged = np.sum((se==CONVITS) + (se==0)) != N
-        if (not unconverged and K>0) or (i==MAXITS-1):
+        if (not unconverged and K>0) or (i==MAXITS):
             dn=1
 
     # Handle plotting and storage of details, if requested
@@ -161,23 +162,21 @@ while not dn:
             else:
                 tmpnetsim = tmpdpsim + tmpexpref
     if DETAILS:
-        netsim[i] = tmpnetsim
-        dpsim[i] = tmpdpsim
-        expref[i] = tmpexpref
-        idx[i,:] = tmpidx
+        netsim[i-1] = tmpnetsim
+        dpsim[i-1] = tmpdpsim
+        expref[i-1] = tmpexpref
+        idx[i-1,:] = tmpidx
     if PLT:
-        netsim[i] = tmpnetsim
+        netsim[i-1] = tmpnetsim
         import matplotlib as mpl
         mpl.use('agg')
         import matplotlib.pyplot as plt
         plt.gcf()
-        tmp = np.arange(i)
-        tmpi = np.argwhere(netsim[0:i] != float('nan'))
+        tmp = np.arange(i-1)
+        tmpi = np.argwhere(netsim[0:i-1] != float('nan'))
         plt.plot(tmp[tmpi], netsim[tmpi], 'r-')
         plt.xlabel('# Iterations')
         plt.ylabel('Net similarity of quantized intermediate solution')
-
-    #i += 1
 
 # Identify exemplars
 E = ((A[M-N:M] + R[M-N:M]) > 0)
@@ -219,20 +218,20 @@ if K>0:
         imx = np.argmax(ss[ee])
         tmpidx[j] = ii[ee[imx]]
         tmpdpsim += smx
-    tmpnetsim += tmpexpref
+    tmpnetsim = tmpdpsim + tmpexpref
 else:
     tmpidx = float('nan')*np.ones(N)
     tmpnetsim = float('nan')
     tmpexpref = float('nan')
 if DETAILS:
-    netsim[i+1] = tmpnetsim
-    netsim = netsim[0:i+1]
-    dpsim[i+1] = tmpnetsim-tmpexpref
-    dpsim = dpsim[0:i+1]
-    expref[i+1] = tmpexpref
-    expref = expref[0:i+1]
-    idx[i+1 , :] = tmpidx
-    idx = idx[0:i+1 , :]
+    netsim[i] = tmpnetsim
+    netsim = netsim[0:i]
+    dpsim[i] = tmpnetsim-tmpexpref
+    dpsim = dpsim[0:i]
+    expref[i] = tmpexpref
+    expref = expref[0:i]
+    idx[i , :] = tmpidx
+    idx = idx[0:i , :]
 else:
     netsim = tmpnetsim
     dpsim = tmpnetsim - tmpexpref
@@ -241,9 +240,9 @@ else:
 if PLT or DETAILS:
     print '\nNumber of identified clusters: %d\n' % K
     print 'Fitness (net similarity): %f\n' % tmpnetsim
-    print '  Similarities of data points to exemplars: %f\n' % dpsim[i]
+    print '  Similarities of data points to exemplars: %f\n' % dpsim[i-1]
     print '  Preferences of selected exemplars: %f\n' % tmpexpref
-    print 'Number of iterations: %d\n\n' % (i+1)
+    print 'Number of iterations: %d\n\n' % i
 if unconverged:
     print '\n*** Warning: Algorithm did not converge. The similarities\n'
     print '    may contain degeneracies - add noise to the similarities\n'
