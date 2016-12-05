@@ -33,7 +33,7 @@ CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Def
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
 PLT = True # Plots net similarity after each iteration
 DETAILS = False # Store idx, netsim, dpsim, expref after each iteration
-NONOISE = True # Degenerate input similarities. True = noise removal.
+NONOISE = False # Degenerate input similarities with random noise.
 if DAMPFACT>0.9:
     print 'Large damping factor, turn on plotting! Consider using larger value of convits.'
 
@@ -255,7 +255,8 @@ if unconverged:
     print '    to remove degeneracies. To monitor the net similarity,\n'
     print '    activate plotting. Also, consider increasing maxits and\n'
     print '    if necessary dampfact.\n\n'
-# Plot figure showing data and the clusters
+
+# Plot figure showing data and the clusters to compare with Matlab
 #print 'Number of clusters: %d\n' % np.size(np.unique(idx))
 if PLT:
     from mpl_toolkits.mplot3d import Axes3D
@@ -265,7 +266,6 @@ if PLT:
         h = fig.scatter(data[0,ii], data[1,ii], zs=data[2,ii])
         plt.hold(True)
         col = np.tile(np.random.rand(1,3), (np.size(ii), 1))
-        print col
         plt.setp(h, color=col, facecolor=col)
         for j in ii:
             fig.plot(np.hstack((data[0,j], data[0,int(i)])),
@@ -278,3 +278,4 @@ if PLT:
         plt.draw()
     plt.axis('image')
     plt.show(block=True)
+    # Grid and 3D rotation w/ mouse enabled by default
