@@ -11,15 +11,19 @@ for i=1:N
   end;
 end;
 p=median(s(:,3)); % Set preference to median similarity
-[idx,netsim,dpsim,expref]=apclusterSparse(s,p,'details','nonoise');
-% fprintf('Number of clusters: %d\n',length(unique(idx)));
-% fprintf('Fitness (net similarity): %f\n',netsim);
-% figure; % Make a figures showing the data and the clusters
-% for i=unique(idx)'
-%   ii=find(idx==i)
-%   h=plot(x(ii,1),x(ii,2),'o'); hold on;
-%   col=rand(1,3); set(h,'Color',col,'MarkerFaceColor',col);
-%   xi1=x(i,1)*ones(size(ii)); xi2=x(i,2)*ones(size(ii)); 
-%   line([x(ii,1),xi1]',[x(ii,2),xi2]','Color',col);
-% end;
-% axis equal tight;
+[idx,netsim,dpsim,expref]=apclusterSparse(s,p,'plot','nonoise');
+%fprintf('Number of clusters: %d\n',length(unique(idx)));
+%fprintf('Fitness (net similarity): %f\n',netsim);
+figure; % Make a figures showing the data and the clusters.
+% 'details' option must not be specified
+for i=unique(idx)'
+  ii=find(idx==i);
+  h=plot3(x(ii,1),x(ii,2),x(ii,3),'o'); hold on;
+  col=rand(1,3); set(h,'Color',col,'MarkerFaceColor',col);
+  xi1=x(i,1)*ones(size(ii)); xi2=x(i,2)*ones(size(ii)); xi3=x(i,3)*ones(size(ii));
+  line([x(ii,1),xi1]',[x(ii,2),xi2]',[x(ii,3),xi3]','Color',col);
+  xlabel('x'); ylabel('y'); zlabel('z');
+end;
+axis square tight;
+grid on;
+rotate3d on;

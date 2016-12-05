@@ -31,8 +31,8 @@ p = np.median(s[2,:]).astype(np.float32)
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
-PLT = False # Plots net similarity after each iteration
-DETAILS = True # Store idx, netsim, dpsim, expref after each iteration
+PLT = True # Plots net similarity after each iteration
+DETAILS = False # Store idx, netsim, dpsim, expref after each iteration
 NONOISE = True # Degenerate input similarities. True = noise removal.
 if DAMPFACT>0.9:
     print 'Large damping factor, turn on plotting! Consider using larger value of convits.'
@@ -169,14 +169,20 @@ while not dn:
     if PLT:
         netsim[i-1] = tmpnetsim
         import matplotlib as mpl
-        mpl.use('agg')
+        #For tesseract server:
+        #mpl.use('agg')
+        #For Bash on Windows & XLaunch:
+        mpl.use('TkAgg')
         import matplotlib.pyplot as plt
-        plt.gcf()
+        plt.figure(1)
         tmp = np.arange(i-1)
         tmpi = np.argwhere(netsim[0:i-1] != float('nan'))
         plt.plot(tmp[tmpi], netsim[tmpi], 'r-')
         plt.xlabel('# Iterations')
         plt.ylabel('Net similarity of quantized intermediate solution')
+        plt.draw()
+plt.ion()
+plt.show()
 
 # Identify exemplars
 E = ((A[M-N:M] + R[M-N:M]) > 0)
@@ -240,7 +246,7 @@ else:
 if PLT or DETAILS:
     print '\nNumber of identified clusters: %d\n' % K
     print 'Fitness (net similarity): %f\n' % tmpnetsim
-    print '  Similarities of data points to exemplars: %f\n' % dpsim[i-1]
+    print '  Similarities of data points to exemplars: %f\n' % dpsim#[i-1]
     print '  Preferences of selected exemplars: %f\n' % tmpexpref
     print 'Number of iterations: %d\n\n' % i
 if unconverged:
@@ -249,3 +255,26 @@ if unconverged:
     print '    to remove degeneracies. To monitor the net similarity,\n'
     print '    activate plotting. Also, consider increasing maxits and\n'
     print '    if necessary dampfact.\n\n'
+# Plot figure showing data and the clusters
+#print 'Number of clusters: %d\n' % np.size(np.unique(idx))
+if PLT:
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure().gca(projection='3d')
+    for i in np.unique(idx):
+        ii = np.argwhere(idx == i)
+        h = fig.scatter(data[0,ii], data[1,ii], zs=data[2,ii])
+        plt.hold(True)
+        col = np.tile(np.random.rand(1,3), (np.size(ii), 1))
+        print col
+        plt.setp(h, color=col, facecolor=col)
+        for j in ii:
+            fig.plot(np.hstack((data[0,j], data[0,int(i)])),
+                     np.hstack((data[1,j], data[1,int(i)])),
+                     zs=np.hstack((data[2,j], data[2,int(i)])),
+                     color=col[0,:])
+        fig.set_xlabel('x')
+        fig.set_ylabel('y')
+        fig.set_zlabel('z')
+        plt.draw()
+    plt.axis('image')
+    plt.show(block=True)
