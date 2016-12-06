@@ -50,7 +50,120 @@ __global__ void preference(float* S) {
 }
 
 // Kernel passes messages and checks for convergence
-__global__ void apupdate
+__global__ void apupdate(float* S, float* R, float* A) {
+    unsigned int blk_os;
+    unsigned int i;
+    unsigned int j;
+    unsigned int k;
+    float temp = 0; //temp register
+    __shared__ float AS[%(N)s];
+    __shared__ float atom_temp = -FLOAT_MAX;
+    __shared__ int max_idx;
+    __shared__ bool dn = false; //convergence flag
+
+    while(!dn) {
+        // COMPUTE RESPONSIBILITIES
+        blk_os = blockIdx.x*%(N)s/blockDim.x + threadIdx.x;
+		// Reads in old R, adds S & A, finds max of the sum
+		for (i=0; i<%(N)s; i+=blockDim.x) {
+			j = i + threadIdx.x;
+			old[j] = R[blk_os + j];
+			float AS_priv = S[blk_os + j] + A[blk_os + j];
+			atomicMax(&atom_temp, AS_priv);
+			AS[j] = AS_priv;
+		}
+		__syncthreads();
+
+		// Updates responsibility, sets the max to -infinity
+		for (i=0; i<%(N)s; i+=blockDim.x) {
+			j = i + threadIdx.x;
+			R[blk_os + j] = S[blk_os + j] - atom_temp;
+			if (AS[j] == atom_temp) {
+				AS[j] = __int_as_float(0xff800000); //-infinity
+				max_idx = j;
+			}
+		}
+		__syncthreads();
+
+		// Find new max
+		for (i=0; i<%(N)s; i+=blockDim.x) {
+			atomicMax(&atom_temp, AS[i + threadIdx.x]);
+		}
+		__syncthreads();
+
+		// Update responsibility again at the max index only
+		if (threadIdx.x == 0)
+			R[blk_os + max_idx] = S[blk_os + max_idx] - atom_temp;
+		__syncthreads();
+
+		// Apply damping
+		for (i=0; i<%(N)s; i+= blockDim.x) {
+			j = i + threadIdx.x;
+			temp = (1-%(DAMP)s)*R[blk_os + j] + %(DAMP)s*old[j];
+			if (temp > FLT_MAX)
+				R[blk_os + j] = FLT_MAX;
+			else
+				R[blk_os + j] = temp;
+		}
+		__syncthreads();
+
+		// COMPUTE AVAILABILITY
+		// Note: indexing is transposed
+
+		// Read in old A, find elementwise max of R, 0
+		j = threadIdx.x*%(N)s;
+		for (i=0; i<%(N)s; i+=blockDim.x) {
+			blk_os = i*%(N)s + blockIdx.x;
+			k = i + threadIdx.x;
+			old[k] = A[blk_os + j];
+			if (R[blk_os + j] > 0) //elementwise max
+				Rp[k] = R[blk_os + j];
+			else
+				Rp[k] = 0;
+			atomicAdd(&atom_temp, Rp[k]); //sum Rp
+		}
+		__syncthreads();
+
+		// Update availability
+		for (i=0; i<%(N)s; i+=blockDim.x) {
+			blk_os = i*%(N)s + blockIdx.x;
+			k = i + threadIdx.x;
+			A[blk_os + j] = atom_temp - Rp[k];
+		}
+		__syncthreads();
+
+		// Grab diagonal
+		if (threadIdx.x == 0)
+			temp = A[blk_Idx.x*%(N)s + blockIdx.x];
+		__syncthreads();
+
+		// Set A to elementwise min of A, 0
+		for (i=0; i<%(N)s; i+=blockDim.x) {
+			blk_os = i*%(N)s + blockIdx.x;
+			if (A[blk_os + j] > 0)
+				A[blk_os + j] = 0;
+		}
+		__syncthreads();
+
+		// Replace diagonal
+		if (threadIdx.x == 0)
+			A[blockIdx.x*%(N)s + blockIdx.x] = dA;
+		__syncthreads();
+
+		// Apply damping
+		for (i=0; i<%(N)s; i+= blockDim.x) {
+			blk_os = i*%(N)s + blockIdx.x;
+			k = i + threadIdx.x;
+			temp = (1-%(DAMP)s)*A[blk_os + j] + %(DAMP)s*old[k];
+			A[blk_os + j] = temp;
+		}
+		__syncthreads();
+
+		// DONE - NEXT KERNEL CHECKS FOR CONVERGENCE
+		// SHIT - WE NEED TO SUM E = (diag(A) + diag(R)) > 0
+		// kernel is called again if unconverged
+
+}
 """
 
 mod = compiler.SourceModule(kernelCUDA % {'N':N, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})

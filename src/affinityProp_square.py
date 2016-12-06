@@ -11,27 +11,25 @@ Sparse similarity matrix is generated here
 data = np.array(ut.readPointCloud('../data/short.xyz'))
 if np.size(data, 0) != 3: print 'Data should be a 3D point cloud'
 if data.dtype != np.float32: print 'Data needs to be float32'
-# Generate sparse similarity matrix
+# Generate similarity matrix
 N = data.shape[1]
-M = N*N-N
-s = np.zeros((3,M), np.float32)
-j = 0
+M = N*N
+s = np.zeros((N,N), np.float32)
 for i in range(N):
-    for k in range(N):
-        if k == i: continue
-        s[0][j] = i
-        s[1][j] = k
-        s[2][j] = -np.sum(np.square(data[:,i] - data[:,k]))
-        j += 1
+    for j in range(N):
+        s[i,j] = -np.sum(np.square(data[:,i] - data[:,j]))
 # Set preference to median similarity
-p = np.mean(s[2,:]).astype(np.float32)
+p = np.mean(s).astype(np.float32)
+# Update diagonal of sparse matrix with preference
+for i in range(N):
+    s[i,i] = p
 
 #PARAMETERS
 #defaults for now
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
-PLT = False # Plots net similarity after each iteration
+PLT = True # Plots net similarity after each iteration
 DETAILS = False # Store idx, netsim, dpsim, expref after each iteration
 NONOISE = False # Degenerate input similarities with random noise.
 if DAMPFACT>0.9:
@@ -44,48 +42,18 @@ if DAMPFACT>0.9:
 # Make vector of preferences
 if np.size(p) == 1: p = p*np.ones(N, np.float32)
 
-# Append self-similarities (preferences) to s-matrix
-tmps = np.vstack((np.tile(range(N), (2,1)), p)).astype(np.float32)
-s = np.hstack((s, tmps))
-M = np.shape(s)[1]
-
+"""
 # Add a small amount of noise to input similarities
 if not NONOISE:
     np.random.seed()
     s[2,0:M] += np.multiply(np.finfo('float32').eps * s[2,0:M] + np.finfo('float32').tiny * 100 , np.random.rand(M))
-
-# Construct indices of neighbors
-ind1e = np.zeros(N, np.int32)
-for j in range(M):
-    k = int(s[0,j])
-    ind1e[k] += 1
-ind1e = np.cumsum(ind1e).astype(np.int32)
-ind1s = np.concatenate((np.zeros(1, np.int32), ind1e[0:-1]))
-ind1 = np.zeros(M, np.int32)
-for j in range(M):
-    k = int(s[0,j])
-    ind1[ind1s[k]] = j
-    ind1s[k] += 1
-ind1s = np.concatenate((np.zeros(1, np.int32), ind1e[0:-1]))
-ind2e = np.zeros(N, np.int32)
-for j in range(M):
-    k = int(s[1,j])
-    ind2e[k] += 1
-ind2e = np.cumsum(ind2e).astype(np.int32)
-ind2s = np.concatenate((np.zeros(1, np.int32), ind2e[0:-1]))
-ind2 = np.zeros(M, np.int32)
-for j in range(M):
-    k = int(s[1,j])
-    ind2[ind2s[k]] = j
-    ind2s[k] += 1
-ind2s = np.concatenate((np.zeros(1, np.int32), ind2e[0:-1]))
-print ind1
-print ind2
+"""
 
 # Allocate space for messages
-A = np.zeros(M, np.float32)
-R = np.zeros(M, np.float32)
-t = 1
+A = np.zeros((N,N), np.float32)
+R = np.zeros((N,N), np.float32)
+E = np.zeros(N, np.int32)
+#t = 1
 if PLT: netsim = np.zeros(MAXITS+1, np.float32)
 if DETAILS:
     idx = np.zeros((MAXITS+1, N), np.float32)
@@ -102,8 +70,8 @@ while not dn:
 
     # Compute responsibilities
     for j in range(N): #looping over i
-        ss = s[2 , ind1[ind1s[j] : ind1e[j]]] # get all s(i,k)
-        a_s = A[ind1[ind1s[j] : ind1e[j]]] + ss # compute a(i,k) + s(i,k)
+        ss = s[j,:] # get all s(i,k)
+        a_s = A[j,:] + ss # compute a(i,k) + s(i,k)
         Y = np.max(a_s).astype(np.float32) # get the max of a(i,k) + s(i,k)
         I = np.argmax(a_s)
         a_s[I] = np.finfo('float32').min # for r(i,k) where max(a+s) occurs at (i,k), need to find the next maximum that occurs (see eqn) so that the max occurs at (i,k') s.t. k != k'
@@ -111,18 +79,21 @@ while not dn:
         I2 = np.argmax(a_s)
         r = ss - Y # do s(i,k) - max(a+s)
         r[I] = ss[I] - Y2 # replace w/ s(i,k) - max(a(i,k')+s(i,k')), k'!=k if max(a+s) was at (i,k)
-        R[ind1[ind1s[j] : ind1e[j]]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]  # dampen
+        R[j,:] = (1-DAMPFACT) * r + DAMPFACT * R[j,:]  # dampen
 
     # Compute availabilities
     for j in range(N): #looping over k
-        rp = R[ind2[ind2s[j] : ind2e[j]]] # get all r(i',k) where i'!=i but k=k (transposed?)
-        rp[0:-1] = np.maximum(rp[0:-1], 0) # elementwise maximum of r(i',k) excl. r(k,k)
+        rp = np.maximum(R[:,j], 0) # elementwise maximum of r transposed
+        rp[j] = R[j,j] # replace r(k,k) which is not subject to max
         a = np.sum(rp) - rp # a(k,k) = sum(max{0,r(i',k)}) s.t. i'!=k, else = sum(max{0,r(i',k)}) + r(k,k) - r(i,k), i'!=k which is equivalent to sum(max{0,r(i'k)}) + r(k,k) for i'!=i,k
-        a[0:-1] = np.minimum(a[0:-1], 0) # elementwise minimum for a(i,k)
-        A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]] # dampen
+        dA = a[j] # grab a(k,k) which is not subject to min
+        a = np.minimum(a, 0) # elementwise minimum for a(i,k)
+        a[j] = dA # replace a(k,k)
+        A[:,j] = (1-DAMPFACT) * a + DAMPFACT * A[:,j] # dampen
 
     # Check for convergence
-    E = (A[M-N::] + R[M-N::]) > 0 # Find where A(i,i)+R(i,i) is > 0 (i.e. find the exemplars)
+    for j in range(N):
+        E[j] = (A[j,j] + R[j,j]) > 0 # Find where A(i,i)+R(i,i) is > 0 (i.e. find the exemplars)
     e[(i-1) % CONVITS , :] = E # Buffer for convergence iterations
     K = np.sum(E).astype(np.int32) # How many exemplars are there?
     if i >= CONVITS or i>= MAXITS:
@@ -130,7 +101,7 @@ while not dn:
         unconverged = np.sum((se==CONVITS) + (se==0)) != N # Unconverged if # of exemplars isn't same for CONVITS
         if (not unconverged and K>0) or (i==MAXITS): # Stop the message passing loop
             dn=1
-            
+
     # Handle plotting and storage of details, if requested
     if PLT or DETAILS:
         if K==0:
@@ -145,8 +116,8 @@ while not dn:
             tmpexpref = np.sum(p[np.argwhere(E)])
             discon = 0
             for j in np.argwhere(E==0).flatten():
-                ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
-                ii = s[1 , ind1[ind1s[j] : ind1e[j]]].astype(np.int32)
+                ss = s[j,:]
+                ii = np.arange(N).astype(np.int32)
                 ee = np.argwhere(E[ii])
                 if np.size(ee) == 0:
                     discon = 1
@@ -187,14 +158,15 @@ if PLT:
     plt.show()
 
 # Identify exemplars
-E = ((A[M-N:M] + R[M-N:M]) > 0)
+for j in range(N):
+    E[j] = (A[j,j] + R[j,j]) > 0
 K = np.sum(E).astype(np.int32)
 if K>0:
     tmpidx=np.zeros(N, np.float32)
     tmpidx[np.argwhere(E)] = np.argwhere(E)
     for j in np.argwhere(E==0).flatten():
-        ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
-        ii = s[1 , ind1[ind1s[j] : ind1e[j]]].astype(np.int32)
+        ss = s[j,:]
+        ii = np.arange(N).astype(np.int32)
         ee = np.argwhere(E[ii])
         #smx = np.max(ss[ee])
         imx = np.argmax(ss[ee])
@@ -206,9 +178,9 @@ if K>0:
         ns = np.zeros(N, np.float32)
         msk = np.zeros(N, np.float32)
         for m in jj:
-            mm = s[1 , ind1[ind1s[m] : ind1e[m]]].astype(np.int32)
+            mm = np.arange(N).astype(np.int32)
             msk[mm] += 1
-            ns[mm] += s[2 , ind1[ind1s[m] : ind1e[m]]]
+            ns[mm] += s[m,:]
         ii = jj[np.argwhere(msk[jj] == np.size(jj))]
         #smx = np.max(ns[ii])
         imx = np.argmax(ns[ii])
@@ -219,8 +191,8 @@ if K>0:
     tmpidx[np.argwhere(E)] = np.argwhere(E)
     tmpexpref = np.sum(p[np.argwhere(E)])
     for j in np.argwhere(E==0).flatten():
-        ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
-        ii = s[1 , ind1[ind1s[j] : ind1e[j]]].astype(np.int32)
+        ss = s[j,:]
+        ii = np.arange(N).astype(np.int32)
         ee = np.argwhere(E[ii])
         smx = np.max(ss[ee])
         imx = np.argmax(ss[ee])
