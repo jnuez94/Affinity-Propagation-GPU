@@ -24,7 +24,7 @@ for i in range(N):
         s[2][j] = -np.sum(np.square(data[:,i] - data[:,k]))
         j += 1
 # Set preference to median similarity
-p = np.median(s[2,:]).astype(np.float32)
+p = np.mean(s[2,:]).astype(np.float32)
 
 #PARAMETERS
 #defaults for now
