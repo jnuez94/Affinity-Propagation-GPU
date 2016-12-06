@@ -99,35 +99,34 @@ while not dn:
     i += 1
 
     # Compute responsibilities
-    for j in range(N):
-        ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
-        a_s = A[ind1[ind1s[j] : ind1e[j]]] + ss
-        Y = np.max(a_s).astype(np.float32)
+    for j in range(N): #looping over i
+        ss = s[2 , ind1[ind1s[j] : ind1e[j]]] # get all s(i,k)
+        a_s = A[ind1[ind1s[j] : ind1e[j]]] + ss # compute a(i,k) + s(i,k)
+        Y = np.max(a_s).astype(np.float32) # get the max of a(i,k) + s(i,k)
         I = np.argmax(a_s)
-        a_s[I] = np.finfo('float32').min
-        Y2 = np.max(a_s).astype(np.float32)
+        a_s[I] = np.finfo('float32').min # for r(i,k) where max(a+s) occurs at (i,k), need to find the next maximum that occurs (see eqn) so that the max occurs at (i,k') s.t. k != k'
+        Y2 = np.max(a_s).astype(np.float32) # find the next max
         I2 = np.argmax(a_s)
-        r = ss - Y
-        r[I] = ss[I] - Y2
-        R[ind1[ind1s[j] : ind1e[j]]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]
+        r = ss - Y # do s(i,k) - max(a+s)
+        r[I] = ss[I] - Y2 # replace w/ s(i,k) - max(a(i,k')+s(i,k')), k'!=k if max(a+s) was at (i,k)
+        R[ind1[ind1s[j] : ind1e[j]]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]  # dampen
 
     # Compute availabilities
-    for j in range(N):
-        rp = R[ind2[ind2s[j] : ind2e[j]]]
-        rp[0:-1] = np.maximum(rp[0:-1], 0) # elementwise maximum!
-        a = np.sum(rp) - rp
-        a[0:-1] = np.minimum(a[0:-1], 0) # elementwise minimum!
-        A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]]
+    for j in range(N): #looping over k
+        rp = R[ind2[ind2s[j] : ind2e[j]]] # get all r(i',k) where i'!=i but k=k (transposed?)
+        rp[0:-1] = np.maximum(rp[0:-1], 0) # elementwise maximum of r(i',k) excl. r(k,k)
+        a = np.sum(rp) - rp # a(k,k) = sum(max{0,r(i',k)}) s.t. i'!=k, else = sum(max{0,r(i',k)}) + r(k,k) - r(i,k), i'!=k which is equivalent to sum(max{0,r(i'k)}) + r(k,k) for i'!=i,k
+        a[0:-1] = np.minimum(a[0:-1], 0) # elementwise minimum for a(i,k)
+        A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]] # dampen
 
     # Check for convergence
-    E = (A[M-N::] + R[M-N::]) > 0
-    #print np.sum(E)
-    e[(i-1) % CONVITS , :] = E
-    K = np.sum(E).astype(np.int32)
+    E = (A[M-N::] + R[M-N::]) > 0 # Find where A(i,i)+R(i,i) is > 0 (i.e. find the exemplars)
+    e[(i-1) % CONVITS , :] = E # Buffer for convergence iterations
+    K = np.sum(E).astype(np.int32) # How many exemplars are there?
     if i >= CONVITS or i>= MAXITS:
-        se = np.sum(e, 0).astype(np.int32)
-        unconverged = np.sum((se==CONVITS) + (se==0)) != N
-        if (not unconverged and K>0) or (i==MAXITS):
+        se = np.sum(e, 0).astype(np.int32) # Sum all convergence iterations
+        unconverged = np.sum((se==CONVITS) + (se==0)) != N # Unconverged if # of exemplars isn't same for CONVITS
+        if (not unconverged and K>0) or (i==MAXITS): # Stop the message passing loop
             dn=1
 
     # Handle plotting and storage of details, if requested

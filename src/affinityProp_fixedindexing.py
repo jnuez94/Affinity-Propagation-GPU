@@ -122,16 +122,15 @@ while not dn:
         A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]] # dampen
 
     # Check for convergence
-    E = (A[M-N::] + R[M-N::]) > 0
-    #print np.sum(E)
-    e[(i-1) % CONVITS , :] = E
-    K = np.sum(E).astype(np.int32)
+    E = (A[M-N::] + R[M-N::]) > 0 # Find where A(i,i)+R(i,i) is > 0 (i.e. find the exemplars)
+    e[(i-1) % CONVITS , :] = E # Buffer for convergence iterations
+    K = np.sum(E).astype(np.int32) # How many exemplars are there?
     if i >= CONVITS or i>= MAXITS:
-        se = np.sum(e, 0).astype(np.int32)
-        unconverged = np.sum((se==CONVITS) + (se==0)) != N
-        if (not unconverged and K>0) or (i==MAXITS):
+        se = np.sum(e, 0).astype(np.int32) # Sum all convergence iterations
+        unconverged = np.sum((se==CONVITS) + (se==0)) != N # Unconverged if # of exemplars isn't same for CONVITS
+        if (not unconverged and K>0) or (i==MAXITS): # Stop the message passing loop
             dn=1
-
+            
     # Handle plotting and storage of details, if requested
     if PLT or DETAILS:
         if K==0:
