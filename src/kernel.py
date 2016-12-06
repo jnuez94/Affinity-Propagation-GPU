@@ -190,7 +190,8 @@ __global__ void convergence(float* A, float* R, int* E, bool *e, int iteration, 
 N = #multiple of 1024
 CONVITS = 100
 MAXITS = 1000
-mod = compiler.SourceModule(kernelCUDA % {'N':N, 'CONVITS':CONVITS})
+DAMPFACT = 0.9
+mod = compiler.SourceModule(kernelCUDA % {'N':N, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
 similarity = mod.get_function("similarity")
 apupdate = mod.get_function("apupdate")
 convergence = mod.get_function("convergence")

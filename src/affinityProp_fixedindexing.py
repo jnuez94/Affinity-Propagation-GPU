@@ -31,7 +31,7 @@ p = np.mean(s[2,:]).astype(np.float32)
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
-PLT = True # Plots net similarity after each iteration
+PLT = False # Plots net similarity after each iteration
 DETAILS = False # Store idx, netsim, dpsim, expref after each iteration
 NONOISE = False # Degenerate input similarities with random noise.
 if DAMPFACT>0.9:
@@ -79,6 +79,8 @@ for j in range(M):
     ind2[ind2s[k]] = j
     ind2s[k] += 1
 ind2s = np.concatenate((np.zeros(1, np.int32), ind2e[0:-1]))
+print ind1
+print ind2
 
 # Allocate space for messages
 A = np.zeros(M, np.float32)
@@ -99,25 +101,25 @@ while not dn:
     i += 1
 
     # Compute responsibilities
-    for j in range(N):
-        ss = s[2 , ind1[ind1s[j] : ind1e[j]]]
-        a_s = A[ind1[ind1s[j] : ind1e[j]]] + ss
-        Y = np.max(a_s).astype(np.float32)
+    for j in range(N): #looping over i
+        ss = s[2 , ind1[ind1s[j] : ind1e[j]]] # get all s(i,k)
+        a_s = A[ind1[ind1s[j] : ind1e[j]]] + ss # compute a(i,k) + s(i,k)
+        Y = np.max(a_s).astype(np.float32) # get the max of a(i,k) + s(i,k)
         I = np.argmax(a_s)
-        a_s[I] = np.finfo('float32').min
-        Y2 = np.max(a_s).astype(np.float32)
+        a_s[I] = np.finfo('float32').min # for r(i,k) where max(a+s) occurs at (i,k), need to find the next maximum that occurs (see eqn) so that the max occurs at (i,k') s.t. k != k'
+        Y2 = np.max(a_s).astype(np.float32) # find the next max
         I2 = np.argmax(a_s)
-        r = ss - Y
-        r[I] = ss[I] - Y2
-        R[ind1[ind1s[j] : ind1e[j]]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]
+        r = ss - Y # do s(i,k) - max(a+s)
+        r[I] = ss[I] - Y2 # replace w/ s(i,k) - max(a(i,k')+s(i,k')), k'!=k if max(a+s) was at (i,k)
+        R[ind1[ind1s[j] : ind1e[j]]] = (1-DAMPFACT) * r + DAMPFACT * R[ind1[ind1s[j] : ind1e[j]]]  # dampen
 
     # Compute availabilities
-    for j in range(N):
-        rp = R[ind2[ind2s[j] : ind2e[j]]]
-        rp[0:-1] = np.maximum(rp[0:-1], 0) # elementwise maximum!
-        a = np.sum(rp) - rp
-        a[0:-1] = np.minimum(a[0:-1], 0) # elementwise minimum!
-        A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]]
+    for j in range(N): #looping over k
+        rp = R[ind2[ind2s[j] : ind2e[j]]] # get all r(i',k) where i'!=i but k=k (transposed?)
+        rp[0:-1] = np.maximum(rp[0:-1], 0) # elementwise maximum of r(i',k) excl. r(k,k)
+        a = np.sum(rp) - rp # a(k,k) = sum(max{0,r(i',k)}) s.t. i'!=k, else = sum(max{0,r(i',k)}) + r(k,k) - r(i,k), i'!=k which is equivalent to sum(max{0,r(i'k)}) + r(k,k) for i'!=i,k
+        a[0:-1] = np.minimum(a[0:-1], 0) # elementwise minimum for a(i,k)
+        A[ind2[ind2s[j] : ind2e[j]]] = (1-DAMPFACT) * a + DAMPFACT * A[ind2[ind2s[j] : ind2e[j]]] # dampen
 
     # Check for convergence
     E = (A[M-N::] + R[M-N::]) > 0

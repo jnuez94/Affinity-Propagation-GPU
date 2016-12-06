@@ -50,11 +50,13 @@ __global__ void preference(float* S) {
 }
 
 // Kernel passes messages and checks for convergence
-
+__global__ void apupdate
 """
 
-mod = compiler.SourceModule(kernelCUDA)
+mod = compiler.SourceModule(kernelCUDA % {'N':N, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
 similarity = mod.get_function("similarity")
+preference = mod.get_function("preference")
+apupdate = mod_get_function("apupdate")
 # kernelCL = """
 
 # """
