@@ -64,7 +64,7 @@ R[j,:] = (1-DAMPFACT) * r + DAMPFACT * R[j,:]  # dampen
 # GPU
 ker.responsibilities(S_gpu, R_gpu, A_gpu, AS_gpu,
 	grid=(j+1,1,1),
-	block=(1024,1,1))
+	block=(N,1,1))
 R_cpu = R_gpu.get()
 A_cpu = A_gpu.get()
 print R_cpu

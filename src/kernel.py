@@ -4,15 +4,20 @@ import pycuda.autoinit
 import numpy as np
 
 kernelCUDA = """
+#include <stdio.h>
 
-__device__ uint FloatFlip(uint f) {
-	uint mask = -int(f >> 31) | 0x80000000;
-	return f^mask;
-}
+// finding max with float using atomicCAS
+__device__ float atomicMaxf(float* address, float val) {
+	
+	int *address_as_int = (int*)address;
+	int old = *address_as_int;
+	int tmp;
 
-__device__ uint IFloatFlip(uint f) {
-	uint mask = ((f >> 31)-1) | 0x80000000;
-	return f^mask;
+	while (val > __int_as_float(old)) {
+		tmp = old;
+		old = atomicCAS(address_as_int, tmp, __float_as_int(val));
+	}
+	return __int_as_float(old);
 }
 
 __global__ void similarity(float* x, float* y, float* z, float* s) {
@@ -63,18 +68,17 @@ __global__ void preference(float* S) {
 }
 
 // Calculate responsibilities
-
 __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 	unsigned int i;
 	unsigned int j;
 	float temp;
 	unsigned int blk_os = blockIdx.x * %(N)s;
-	__shared__ unsigned int max[2];
+	__shared__ float max[2];
 	__shared__ unsigned int max_idx;
 
 	// default maximum to minimum representable float
 	if (threadIdx.x <= 1)
-		max[threadIdx.x] = 0;
+		max[threadIdx.x] = %(NEG_MAX)s;
 	__syncthreads();
 
 	// AS = A + S
@@ -82,7 +86,7 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 		j = blk_os + i + threadIdx.x;
 		temp = A[j] + S[j];
 		AS[j] = temp;
-		atomicMax(&max[0], FloatFlip((uint)temp)); // find maximum
+		atomicMaxf(&max[0], temp); // find maximum
 	}
 	__syncthreads();
 
@@ -90,27 +94,27 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		temp = AS[j];
-
-		if (temp == (float)IFloatFlip(max[0])) {
+		if (temp == max[0]) {
 		 	temp = %(NEG_MAX)s;
 			AS[j] = temp;
 			max_idx = j;
 		}
-		atomicMax(&max[1], FloatFlip((uint)temp)); // find next max
+		atomicMaxf(&max[1], temp); // find next max
 	}
 	__syncthreads();
-
+	
 	// Apply damping and get new responsibility
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		float old_R = R[j];
 		if (j == max_idx)
-			temp = S[j] - (float)IFloatFlip(max[1]);
+			temp = S[j] - max[1];
 		else
-			temp = S[j] - (float)IFloatFlip(max[0]);
+			temp = S[j] - max[0];
 		R[j] = (1-%(DAMP)s) * temp + %(DAMP)s * old_R;
 	}
 }
+
 /*
 // Kernel passes messages. Each block of 1024 threads computes 1 row (N) of A & R.
 __global__ void apupdate(float* S, float* R, float* A) {
