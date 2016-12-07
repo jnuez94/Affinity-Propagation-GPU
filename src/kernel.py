@@ -19,11 +19,11 @@ __global__ void similarity(float* x, float* y, float* z, float* s) {
 
 	dist = -(xi*xi + yi*yi + zi*zi);
 
-	s[row*size+col] = dist;
+	s[row*%(N)s+col] = dist;
 	__syncthreads();
 }
 
-/ Calculate the preference with a single block, 1024 threads
+// Calculate the preference with a single block, 1024 threads
 // Should be median but this is a mean
 __global__ void preference(float* S) {
 	unsigned int i;
@@ -32,19 +32,22 @@ __global__ void preference(float* S) {
     float P_priv = 0.0;
     __shared__ float P_sh[1];
 
+	if(threadIdx.x == 0)
+		P_sh[0] = 0.0;
+
 	// Calculate the mean by adding the lower triangle of S, which is symmetrical
     for (i=0; i<%(N)s; i++) {
 		for (j=0; j<=i/blockDim.x; j++) {
-			k = threadIdx.x * blockDim.x * j;
+			k = threadIdx.x + blockDim.x * j;
 			if (k < i)
 				P_priv += S[i*%(N)s + k];
 		}
 	}
-    atomicAdd(&P_sh, 2*P_priv/%(N)s/%(N)s);
+    atomicAdd(&P_sh[0], 2*P_priv/%(N)s/%(N)s);
     __syncthreads();
 
     for (j=0; j<%(N)s; j+=blockDim.x) {
-		S[(j + threadIdx.x)*(%(N)s + 1)] = P_sh;
+		S[(j + threadIdx.x)*(%(N)s + 1)] = P_sh[0];
     }
 }
 /*
@@ -213,6 +216,7 @@ __global__ void convergence(float* A, float* R, int* E, bool *e, int iteration, 
 */
 """
 
+N = 32
 CONVITS = 100
 MAXITS = 1000
 DAMPFACT = 0.9
