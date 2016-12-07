@@ -4,12 +4,12 @@ import pycuda.autoinit
 
 kernelCUDA = """
 
-__global__ void similarity(float* x, float* y, float* z, float* similarity, int size) {
+__global__ void similarity(float* x, float* y, float* z, float* s) {
 
 	unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
 	unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
 
-	if (col >= size || row >= size)
+	if (col >= %(N)s || row >= %(N)s)
 		return;
 
 	float dist = 0;
@@ -19,10 +19,35 @@ __global__ void similarity(float* x, float* y, float* z, float* similarity, int 
 
 	dist = -(xi*xi + yi*yi + zi*zi);
 
-	similarity[row*size+col] = dist;
+	s[row*size+col] = dist;
 	__syncthreads();
 }
 
+/ Calculate the preference with a single block, 1024 threads
+// Should be median but this is a mean
+__global__ void preference(float* S) {
+	unsigned int i;
+    unsigned int j;
+    unsigned int k;
+    float P_priv = 0.0;
+    __shared__ float P_sh[1];
+
+	// Calculate the mean by adding the lower triangle of S, which is symmetrical
+    for (i=0; i<%(N)s; i++) {
+		for (j=0; j<=i/blockDim.x; j++) {
+			k = threadIdx.x * blockDim.x * j;
+			if (k < i)
+				P_priv += S[i*%(N)s + k];
+		}
+	}
+    atomicAdd(&P_sh, 2*P_priv/%(N)s/%(N)s);
+    __syncthreads();
+
+    for (j=0; j<%(N)s; j+=blockDim.x) {
+		S[(j + threadIdx.x)*(%(N)s + 1)] = P_sh;
+    }
+}
+/*
 // Kernel passes messages. Each block of 1024 threads computes 1 row (N) of A & R.
 __global__ void apupdate(float* S, float* R, float* A) {
 	unsigned int blk_os;
@@ -185,13 +210,14 @@ __global__ void convergence(float* A, float* R, int* E, bool *e, int iteration, 
 			converged = true;
 	}
 }
+*/
 """
 
-N = #multiple of 1024
 CONVITS = 100
 MAXITS = 1000
 DAMPFACT = 0.9
 mod = compiler.SourceModule(kernelCUDA % {'N':N, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
 similarity = mod.get_function("similarity")
-apupdate = mod.get_function("apupdate")
-convergence = mod.get_function("convergence")
+preference = mod.get_function("preference")
+#apupdate = mod.get_function("apupdate")
+#convergence = mod.get_function("convergence")
