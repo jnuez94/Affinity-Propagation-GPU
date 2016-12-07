@@ -1,8 +1,19 @@
 #!/usr/bin/env python
 from pycuda import driver, compiler, gpuarray, tools
 import pycuda.autoinit
+import numpy as np
 
 kernelCUDA = """
+
+__device__ uint FloatFlip(uint f) {
+	uint mask = -int(f >> 31) | 0x80000000;
+	return f^mask;
+}
+
+__device__ uint IFloatFlip(uint f) {
+	uint mask = ((f >> 31)-1) | 0x80000000;
+	return f^mask;
+}
 
 __global__ void similarity(float* x, float* y, float* z, float* s) {
 
@@ -58,43 +69,45 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 	unsigned int j;
 	float temp;
 	unsigned int blk_os = blockIdx.x * %(N)s;
-	__shared__ float max[2];
-	__shared__ int max_idx;
+	__shared__ unsigned int max[2];
+	__shared__ unsigned int max_idx;
 
 	// default maximum to minimum representable float
 	if (threadIdx.x <= 1)
-		max[threadIdx.x] = %(NEG_MAX)s;
+		max[threadIdx.x] = 0;
+	__syncthreads();
 
 	// AS = A + S
-	for (i=0; i<%(N)s, i+=blockDim.x) {
+	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		temp = A[j] + S[j];
 		AS[j] = temp;
-		atomicMax(&max[0], temp); // find maximum
+		atomicMax(&max[0], FloatFlip((uint)temp)); // find maximum
 	}
 	__syncthreads();
 
 	// Set max(AS) = -Inf then find next max
-	for (i=0; i<%(N)s, i+=blockDim.x) {
+	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		temp = AS[j];
-		if (temp == max[0]) {
+
+		if (temp == (float)IFloatFlip(max[0])) {
 		 	temp = %(NEG_MAX)s;
 			AS[j] = temp;
 			max_idx = j;
 		}
-		atomicMax(&max[1], temp); // find next max
+		atomicMax(&max[1], FloatFlip((uint)temp)); // find next max
 	}
 	__syncthreads();
 
 	// Apply damping and get new responsibility
-	for (i=0; i<%(N)s, i+=blockDim.x) {
+	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
-		float old_R = R[j]
+		float old_R = R[j];
 		if (j == max_idx)
-			temp = S[j] - max[1];
+			temp = S[j] - (float)IFloatFlip(max[1]);
 		else
-			temp = S[j] - max[0];
+			temp = S[j] - (float)IFloatFlip(max[0]);
 		R[j] = (1-%(DAMP)s) * temp + %(DAMP)s * old_R;
 	}
 }
@@ -272,5 +285,6 @@ DAMPFACT = 0.9
 mod = compiler.SourceModule(kernelCUDA % {'N':N, 'NEG_MAX':NEG_MAX, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
 similarity = mod.get_function("similarity")
 preference = mod.get_function("preference")
+responsibilities = mod.get_function("responsibilities")
 #apupdate = mod.get_function("apupdate")
 #convergence = mod.get_function("convergence")
