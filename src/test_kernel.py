@@ -73,3 +73,27 @@ print "Validation: ", np.allclose(R[j,:], R_cpu)
 print "Validation: ", np.allclose(A[j,:], A_cpu)
 #print R[j,:]
 #print A[j,:]
+
+# TEST AVAILABILITY KERNEL
+RP = np.zeros((N,N), np.float32)
+A_gpu = ker.gpuarray.to_gpu(A[:,j])
+R_gpu = ker.gpuarray.to_gpu(R[:,j])
+RP_gpu = ker.gpuarray.to_gpu(RP[:,j])
+
+#CPU
+rp = np.maximum(R[:,j], 0) # elementwise maximum of r transposed
+rp[j] = R[j,j] # replace r(k,k) which is not subject to max
+a = np.sum(rp) - rp # a(k,k) = sum(max{0,r(i',k)}) s.t. i'!=k, else = sum(max{0,r(i',k)}) + r(k,k) - r(i,k), i'!=k which is equivalent to sum(max{0,r(i'k)}) + r(k,k) for i'!=i,k
+dA = a[j] # grab a(k,k) which is not subject to min
+a = np.minimum(a, 0) # elementwise minimum for a(i,k)
+a[j] = dA # replace a(k,k)
+A[:,j] = (1-DAMPFACT) * a + DAMPFACT * A[:,j] # dampen
+
+#GPU
+iteration = 0
+ker.availabilities(A_gpu, R_gpu, RP_gpu, np.int32(iteration),
+	grid=(j+1,1,1),
+	block=(N,1,1))
+A_cpu = A_gpu.get()
+print A_cpu
+print "Validation: ", np.allclose(A[:,j], A_cpu)

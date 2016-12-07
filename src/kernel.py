@@ -8,7 +8,7 @@ kernelCUDA = """
 
 // finding max with float using atomicCAS
 __device__ float atomicMaxf(float* address, float val) {
-	
+
 	int *address_as_int = (int*)address;
 	int old = *address_as_int;
 	int tmp;
@@ -120,6 +120,40 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 	}
 }
 
+// Calculate availabilities
+__global__ void availabilities(float* A, float* R, float* RP, int iteration) {
+	unsigned int i;
+	unsigned int j;
+	float rp;
+	float a;
+	float a_old;
+	float sum_priv = 0.0;
+	unsigned int blk_os = blockIdx.x * %(N)s;
+	__shared__ float sum[1];
+
+	// Get elementwise maximum of R and calculate sum
+	for (i=0; i<%(N)s; i+=blockDim.x) {
+		j = blk_os + i + threadIdx.x;
+		rp = R[j];
+		if (rp < 0.0 && j != iteration*gridDim.x+blockIdx.x)
+			rp = 0.0;
+		RP[j] = rp;
+		sum_priv += rp;
+	}
+	atomicAdd(&sum[0], sum_priv);
+	__syncthreads();
+	sum_priv = sum[0];
+
+	// Calculate new availability
+	for (i=0; i<%(N)s; i+=blockDim.x) {
+		j = blk_os + i + threadIdx.x;
+		a = sum_priv - RP[j];
+		if (a > 0.0 && j != iteration*gridDim.x+blockIdx.x)
+			a = 0.0;
+		a_old = A[j];
+		A[j] = (1-%(DAMP)s)*a + %(DAMP)s*a_old; //dampen
+	}
+}
 /*
 // Kernel passes messages. Each block of 1024 threads computes 1 row (N) of A & R.
 __global__ void apupdate(float* S, float* R, float* A) {
@@ -295,5 +329,6 @@ mod = compiler.SourceModule(kernelCUDA % {'N':N, 'NEG_MAX':NEG_MAX, 'CONVITS':CO
 similarity = mod.get_function("similarity")
 preference = mod.get_function("preference")
 responsibilities = mod.get_function("responsibilities")
+availabilities = mod.get_function("availabilities")
 #apupdate = mod.get_function("apupdate")
 #convergence = mod.get_function("convergence")
