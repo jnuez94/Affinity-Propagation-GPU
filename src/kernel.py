@@ -131,6 +131,9 @@ __global__ void availabilities(float* A, float* R, float* RP, int iteration) {
 	unsigned int blk_os = blockIdx.x * %(N)s;
 	__shared__ float sum[1];
 
+	if(threadIdx.x == 0)
+		sum[0] = 0.0;
+	__syncthreads();
 	// Get elementwise maximum of R and calculate sum
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;

@@ -96,4 +96,5 @@ ker.availabilities(A_gpu, R_gpu, RP_gpu, np.int32(iteration),
 	block=(N,1,1))
 A_cpu = A_gpu.get()
 print A_cpu
+print A[:,j]
 print "Validation: ", np.allclose(A[:,j], A_cpu)
