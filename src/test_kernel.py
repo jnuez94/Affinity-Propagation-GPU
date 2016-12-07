@@ -51,7 +51,7 @@ A = np.zeros((N,N), np.float32)
 R = np.zeros((N,N), np.float32)
 A_cpu = np.zeros((N,N), np.float32)
 R_cpu = np.zeros((N,N), np.float32)
-AS_gpu = ker.gpuarray.zeros((N,N)), np.float32)
+AS_gpu = ker.gpuarray.zeros((N,N), np.float32)
 RP = np.zeros((N,N), np.float32)
 RP_gpu = ker.gpuarray.zeros((N,N), np.float32)
 E = np.zeros(N, np.bool)
@@ -124,15 +124,15 @@ while not dn and i < MAXITS:
 	R_gpu = ker.gpuarray.to_gpu(np.diag(R_cpu))
 
 	#CPU
-    for j in range(N):
-        E[j] = (A[j,j] + R[j,j]) > 0 # Find where A(i,i)+R(i,i) is > 0 (i.e. find the exemplars)
-    e[(i-1) % CONVITS , :] = E # Buffer for convergence iterations
-    K = np.sum(E).astype(np.int32) # How many exemplars are there?
-    if i >= CONVITS or i>= MAXITS:
-        se = np.sum(e, 0).astype(np.int32) # Sum all convergence iterations
-        unconverged = np.sum((se==CONVITS) + (se==0)) != N # Unconverged if # of exemplars isn't same for CONVITS
-        if (not unconverged and K>0) or (i==MAXITS): # Stop the message passing loop
-            dn=1
+	for j in range(N):
+		E[j] = (A[j,j] + R[j,j]) > 0 # Find where A(i,i)+R(i,i) is > 0 (i.e. find the exemplars)
+	e[(i-1) % CONVITS , :] = E # Buffer for convergence iterations
+	K = np.sum(E).astype(np.int32) # How many exemplars are there?
+	if i >= CONVITS or i>= MAXITS:
+		se = np.sum(e, 0).astype(np.int32) # Sum all convergence iterations
+		unconverged = np.sum((se==CONVITS) + (se==0)) != N # Unconverged if # of exemplars isn't same for CONVITS
+		if (not unconverged and K>0) or (i==MAXITS): # Stop the message passing loop
+		dn=1
 
 	#GPU
 	ker.convergence(A_gpu, R_gpu, E_gpu, e_gpu, se_gpu, np.int32(i), converged_gpu,
