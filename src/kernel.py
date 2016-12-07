@@ -72,6 +72,7 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 	unsigned int i;
 	unsigned int j;
 	float temp;
+	float pmax[2] = {%(NEG_MAX)s, %(NEG_MAX)s};
 	unsigned int blk_os = blockIdx.x * %(N)s;
 	__shared__ float max[2];
 	__shared__ unsigned int max_idx;
@@ -86,31 +87,35 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 		j = blk_os + i + threadIdx.x;
 		temp = A[j] + S[j];
 		AS[j] = temp;
-		atomicMaxf(&max[0], temp); // find maximum
+		pmax[0] = (pmax[0] >= temp)*pmax[0] + (pmax[0] < temp)*temp;
 	}
+	atomicMaxf(&max[0], pmax[0]); // find maximum
 	__syncthreads();
 
+	pmax[0] = max[0];
 	// Set max(AS) = -Inf then find next max
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		temp = AS[j];
-		if (temp == max[0]) {
+		if (temp == pmax[0]) {
 		 	temp = %(NEG_MAX)s;
 			AS[j] = temp;
 			max_idx = j;
 		}
-		atomicMaxf(&max[1], temp); // find next max
+		pmax[1] = (pmax[1] >= temp)*pmax[1] + (pmax[1] < temp)*temp;
 	}
+	atomicMaxf(&max[1], pmax[1]); // find next max
 	__syncthreads();
-	
+
+	pmax[1] = max[1];
 	// Apply damping and get new responsibility
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		float old_R = R[j];
 		if (j == max_idx)
-			temp = S[j] - max[1];
+			temp = S[j] - pmax[1];
 		else
-			temp = S[j] - max[0];
+			temp = S[j] - pmax[0];
 		R[j] = (1-%(DAMP)s) * temp + %(DAMP)s * old_R;
 	}
 }

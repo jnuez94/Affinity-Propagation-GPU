@@ -2,7 +2,7 @@ import kernel as ker
 import utility as ut
 import numpy as np
 
-x, y, z = ut.readPointCloud('../data/short.xyz')
+x, y, z = ut.readPointCloud('./data/short.xyz')
 xi = np.copy(x).astype(np.float32)
 yi = np.copy(y).astype(np.float32)
 zi = np.copy(z).astype(np.float32)

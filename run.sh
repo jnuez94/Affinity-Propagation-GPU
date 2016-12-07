@@ -19,3 +19,4 @@ while  [ true ]
 echo "";
 cat slurm-*.out;
 echo "";
+rm slurm-*.out;
