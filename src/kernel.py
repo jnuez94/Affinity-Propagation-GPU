@@ -50,6 +50,54 @@ __global__ void preference(float* S) {
 		S[(j + threadIdx.x)*(%(N)s + 1)] = P_sh[0];
     }
 }
+
+// Calculate responsibilities
+
+__global__ void responsibilities(float* S, float* R, float* A, float *AS) {
+	unsigned int i;
+	unsigned int j;
+	float temp;
+	unsigned int blk_os = blockIdx.x * %(N)s;
+	__shared__ float max[2];
+	__shared__ int max_idx;
+
+	// default maximum to minimum representable float
+	if (threadIdx.x <= 1)
+		max[threadIdx.x] = %(NEG_MAX)s;
+
+	// AS = A + S
+	for (i=0; i<%(N)s, i+=blockDim.x) {
+		j = blk_os + i + threadIdx.x;
+		temp = A[j] + S[j];
+		AS[j] = temp;
+		atomicMax(&max[0], temp); // find maximum
+	}
+	__syncthreads();
+
+	// Set max(AS) = -Inf then find next max
+	for (i=0; i<%(N)s, i+=blockDim.x) {
+		j = blk_os + i + threadIdx.x;
+		temp = AS[j];
+		if (temp == max[0]) {
+		 	temp = %(NEG_MAX)s;
+			AS[j] = temp;
+			max_idx = j;
+		}
+		atomicMax(&max[1], temp); // find next max
+	}
+	__syncthreads();
+
+	// Apply damping and get new responsibility
+	for (i=0; i<%(N)s, i+=blockDim.x) {
+		j = blk_os + i + threadIdx.x;
+		float old_R = R[j]
+		if (j == max_idx)
+			temp = S[j] - max[1];
+		else
+			temp = S[j] - max[0];
+		R[j] = (1-%(DAMP)s) * temp + %(DAMP)s * old_R;
+	}
+}
 /*
 // Kernel passes messages. Each block of 1024 threads computes 1 row (N) of A & R.
 __global__ void apupdate(float* S, float* R, float* A) {
@@ -217,10 +265,11 @@ __global__ void convergence(float* A, float* R, int* E, bool *e, int iteration, 
 """
 
 N = 32
+NEG_MAX = np.finfo('float32').min
 CONVITS = 100
 MAXITS = 1000
 DAMPFACT = 0.9
-mod = compiler.SourceModule(kernelCUDA % {'N':N, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
+mod = compiler.SourceModule(kernelCUDA % {'N':N, 'NEG_MAX':NEG_MAX, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
 similarity = mod.get_function("similarity")
 preference = mod.get_function("preference")
 #apupdate = mod.get_function("apupdate")

@@ -36,3 +36,36 @@ pref = np.mean(sim)
 for i in range(N):
 	sim[i,i] = pref
 print "Validation: ", np.allclose(sim, sim_cpu)
+
+# TEST RESPONSIBILITY KERNEL
+
+j = 0;  #1st row
+A = np.zeros((N,N), np.float32)
+R = np.zeros((N,N), np.float32)
+S_gpu = ker.gpuarray.to_gpu(sim_cpu[j,:])
+A_gpu = ker.gpuarray.to_gpu(A[j,:])
+R_gpu = ker.gpuarray.to_gpu(R[j,:])
+AS_gpu = ker.gpuarray.zeros(R[j,:].shape, np.float32)
+
+#CPU
+ss = sim_cpu[j,:] # get all s(i,k)
+a_s = A[j,:] + ss # compute a(i,k) + s(i,k)
+Y = np.max(a_s).astype(np.float32) # get the max of a(i,k) + s(i,k)
+I = np.argmax(a_s)
+a_s[I] = np.finfo('float32').min # for r(i,k) where max(a+s) occurs at (i,k), need to find the next maximum that occurs (see eqn) so that the max occurs at (i,k') s.t. k != k'
+Y2 = np.max(a_s).astype(np.float32) # find the next max
+I2 = np.argmax(a_s)
+r = ss - Y # do s(i,k) - max(a+s)
+r[I] = ss[I] - Y2 # replace w/ s(i,k) - max(a(i,k')+s(i,k')), k'!=k if max(a+s) was at (i,k)
+R[j,:] = (1-DAMPFACT) * r + DAMPFACT * R[j,:]  # dampen
+
+# GPU
+ker.responsibilities(S_gpu, R_gpu, A_gpu, AS_gpu,
+	grid=(j+1,1,1),
+	block=(1024,1,1))
+R_cpu = R_gpu.get()
+A_cpu = A_gpu.get()
+print R_cpu
+print A_cpu
+print "Validation: ", np.allclose(R, R_cpu)
+print "Validation: ", np.allclose(A, A_cpu)
