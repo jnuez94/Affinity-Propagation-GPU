@@ -163,42 +163,42 @@ for j in range(N):
 K = np.sum(E).astype(np.int32)
 if K>0:
     tmpidx=np.zeros(N, np.float32)
-    tmpidx[np.argwhere(E)] = np.argwhere(E)
-    for j in np.argwhere(E==0).flatten():
-        ss = s[j,:]
-        ii = np.arange(N).astype(np.int32)
-        ee = np.argwhere(E[ii])
+    tmpidx[np.argwhere(E)] = np.argwhere(E) # store index of exemplar as itself
+    for j in np.argwhere(E==0).flatten(): # for non-exemplars
+        ss = s[j,:] # get similarity for non-exemplars
+        ii = np.arange(N).astype(np.int32) # 0 to N-1
+        ee = np.argwhere(E[ii]) # indices of exemplars
         #smx = np.max(ss[ee])
-        imx = np.argmax(ss[ee])
-        tmpidx[j] = ii[ee[imx]]
+        imx = np.argmax(ss[ee]) # find the exemplar that jth point belongs to
+        tmpidx[j] = ii[ee[imx]] # store the index of that exemplar
     EE = np.zeros(N, np.float32)
-    for j in np.argwhere(E).flatten():
-        jj = np.argwhere(tmpidx==j).flatten()
+    for j in np.argwhere(E).flatten(): # for exemplars
+        jj = np.argwhere(tmpidx==j).flatten() # jj contains all points in a cluster
         mx = float('-Inf')
         ns = np.zeros(N, np.float32)
         msk = np.zeros(N, np.float32)
-        for m in jj:
-            mm = np.arange(N).astype(np.int32)
-            msk[mm] += 1
-            ns[mm] += s[m,:]
-        ii = jj[np.argwhere(msk[jj] == np.size(jj))]
+        for m in jj: # for all points in cluster
+            mm = np.arange(N).astype(np.int32) # 0 to N-1
+            msk[mm] += 1 # Equals number of points in cluster
+            ns[mm] += s[m,:] # Net similarity to each point in the cluster
+        ii = jj[np.argwhere(msk[jj] == np.size(jj))] # ii equals the cluster (=jj)
         #smx = np.max(ns[ii])
-        imx = np.argmax(ns[ii])
-        EE[ii[imx]] = 1
-    E = EE
+        imx = np.argmax(ns[ii]) # find max net similarity in cluster
+        EE[ii[imx]] = 1 # Set EE at point with max net similarity to 1
+    E = EE # Make E contain the few new candidate exemplars
     tmpidx = np.zeros(N, np.float32)
     tmpdpsim = 0
-    tmpidx[np.argwhere(E)] = np.argwhere(E)
-    tmpexpref = np.sum(p[np.argwhere(E)])
-    for j in np.argwhere(E==0).flatten():
-        ss = s[j,:]
+    tmpidx[np.argwhere(E)] = np.argwhere(E) # store indices of the new exemplars
+    tmpexpref = np.sum(p[np.argwhere(E)]) # sum of preferences at exemplars (= preference * # of exemplars)
+    for j in np.argwhere(E==0).flatten(): # for non-exemplars
+        ss = s[j,:] # get similarities
         ii = np.arange(N).astype(np.int32)
-        ee = np.argwhere(E[ii])
-        smx = np.max(ss[ee])
-        imx = np.argmax(ss[ee])
-        tmpidx[j] = ii[ee[imx]]
-        tmpdpsim += smx
-    tmpnetsim = tmpdpsim + tmpexpref
+        ee = np.argwhere(E[ii]) # indices of exemplars
+        smx = np.max(ss[ee]) # find greatest similarity to current point
+        imx = np.argmax(ss[ee]) # get index of that point
+        tmpidx[j] = ii[ee[imx]] # store the index of that point
+        tmpdpsim += smx # sum of max similarities to non-exemplars
+    tmpnetsim = tmpdpsim + tmpexpref # net similarity is max similarities + sum of preferences
 else:
     tmpidx = float('nan')*np.ones(N)
     tmpnetsim = float('nan')
