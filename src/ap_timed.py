@@ -9,6 +9,7 @@ utility.py reads data and generates float32 numpy array of coordinates
 Square similarity matrix is generated here
 """
 # PARAMETERS
+N = 2048
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
@@ -22,10 +23,8 @@ if PLT: netsim = np.zeros(MAXITS+1, np.float32)
 start_prg = time.time()
 
 # Read point cloud
-data = np.array(ut.readPointCloud('../data/short.xyz'))
+data = np.array(ut.readPointCloud('../data/data.xyz', N))
 # Generate similarity matrix
-N = data.shape[1]
-M = N*N
 start_ker = time.time()
 s = np.zeros((N,N), np.float32)
 for i in range(N):
@@ -86,6 +85,7 @@ while not dn:
             dn=1
 
 kernel_time = float(time.time()-start_ker)
+print np.argwhere(E)
 
 # Identify exemplars
 for j in range(N):
