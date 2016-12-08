@@ -141,7 +141,7 @@ idx = tmpidx
 
 program_time = float(time.time() - start_prg)
 
-if PLT or DETAILS:
+if PLT:
     print '\nNumber of identified clusters: %d\n' % K
     print 'Fitness (net similarity): %f\n' % tmpnetsim
     print '  Similarities of data points to exemplars: %f\n' % dpsim
