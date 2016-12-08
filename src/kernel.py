@@ -121,9 +121,10 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 }
 
 // Calculate availabilities
-__global__ void availabilities(float* A, float* R, float* RP, int iteration) {
+__global__ void availabilities(float* A, float* R, float* RP, unsigned int iteration) {
 	unsigned int i;
 	unsigned int j;
+	unsigned int diag = (iteration*gridDim.x+blockIdx.x)*(%(N)s+1);
 	float rp;
 	float a;
 	float a_old;
@@ -138,7 +139,7 @@ __global__ void availabilities(float* A, float* R, float* RP, int iteration) {
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		rp = R[j];
-		if (rp < 0.0 && j != iteration*gridDim.x+blockIdx.x)
+		if (rp < 0.0 && j != diag)
 			rp = 0.0;
 		RP[j] = rp;
 		sum_priv += rp;
@@ -151,7 +152,7 @@ __global__ void availabilities(float* A, float* R, float* RP, int iteration) {
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
 		a = sum_priv - RP[j];
-		if (a > 0.0 && j != iteration*gridDim.x+blockIdx.x)
+		if (a > 0.0 && j != diag)
 			a = 0.0;
 		a_old = A[j];
 		A[j] = (1-%(DAMP)s)*a + %(DAMP)s*a_old; //dampen
@@ -162,14 +163,16 @@ __global__ void availabilities(float* A, float* R, float* RP, int iteration) {
 // Use 1 block of 1024 threads
 // Note the converged flag only tells CPU to stop iterating.
 // CPU will not call this if MAXITS hit, so maxits checks are removed
-__global__ void convergence(float* A, float* R, bool* E, int* e, int* se, int iteration, bool converged) {
+__global__ void convergence(float* A, float* R, bool* E, unsigned int* e,
+ 	unsigned int* se, unsigned int iteration, bool* converged) {
 	unsigned int i;
 	unsigned int j;
-	unsigned bool E_priv;
+	unsigned int k;
+	bool E_priv;
 	unsigned int e_sum = 0;
 	unsigned int temp = 0;
-	__shared__ int K[1]; //sum of E
-	__shared__ int conv_sum[1];
+	__shared__ unsigned int K[1]; //sum of E
+	__shared__ unsigned int conv_sum[1];
 
 	if (threadIdx.x == 0) {
 		K[0] = 0;
@@ -181,9 +184,9 @@ __global__ void convergence(float* A, float* R, bool* E, int* e, int* se, int it
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = i + threadIdx.x;
 		E_priv = (A[j] + R[j]) > 0;
-		e[((iteration-1) % %(CONVITS)s)*%(N)s + j] = (int)E_priv;
+		e[((iteration-1) %% %(CONVITS)s)*%(N)s + j] = E_priv;
 		E[j] = E_priv;
-		atomicAdd(&K[0], (int)E_priv);
+		atomicAdd(&K[0], E_priv);
 	}
 	__syncthreads();
 
@@ -194,11 +197,11 @@ __global__ void convergence(float* A, float* R, bool* E, int* e, int* se, int it
 			for (k=0; k<%(CONVITS)s; k++)
 				e_sum += e[k*%(N)s + j];
 			se[j] = e_sum;
-			temp += (int)((e_sum == %(CONVITS)s) + (e_sum == 0));
+			temp += (e_sum == %(CONVITS)s) + (e_sum == 0);
 		}
 		atomicAdd(&conv_sum[0], temp);
 		__syncthreads();
-		converged = (conv_sum[0] == %(N)s) && (K[0] > 0) && (threadIdx.x == 0);
+		converged[0] = (conv_sum[0] == %(N)s) && (K[0] > 0);// && (threadIdx.x == 0);
 	}
 }
 """
