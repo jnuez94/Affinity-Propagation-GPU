@@ -206,14 +206,14 @@ __global__ void convergence(float* A, float* R, bool* E, unsigned int* e,
 }
 """
 
-N = 32
-NEG_MAX = np.finfo('float32').min
-CONVITS = 100
-MAXITS = 1000
-DAMPFACT = 0.9
-mod = compiler.SourceModule(kernelCUDA % {'N':N, 'NEG_MAX':NEG_MAX, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
-similarity = mod.get_function("similarity")
-preference = mod.get_function("preference")
-responsibilities = mod.get_function("responsibilities")
-availabilities = mod.get_function("availabilities")
-convergence = mod.get_function("convergence")
+# N = 32
+# NEG_MAX = np.finfo('float32').min
+# CONVITS = 100
+# MAXITS = 1000
+# DAMPFACT = 0.9
+# mod = compiler.SourceModule(kernelCUDA % {'N':N, 'NEG_MAX':NEG_MAX, 'CONVITS':CONVITS, 'DAMP':DAMPFACT})
+# similarity = mod.get_function("similarity")
+# preference = mod.get_function("preference")
+# responsibilities = mod.get_function("responsibilities")
+# availabilities = mod.get_function("availabilities")
+# convergence = mod.get_function("convergence")

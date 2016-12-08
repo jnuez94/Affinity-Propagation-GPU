@@ -4,11 +4,14 @@ import numpy as np
 
 # Parameter: filename of the data set
 # Return: x, y, z numpy arrays.
-def readPointCloud(filename):
+def readPointCloud(filename, size):
 	x = []
 	y = []
 	z = []
-	for lines in open(filename).readlines():
+	data = open(filename)
+	for i, lines in enumerate(data):
+		if i == size:
+			break
 		xi, yi, zi, _, _ = lines.split(' ')
 		x.append(float(xi))
 		y.append(float(yi))
