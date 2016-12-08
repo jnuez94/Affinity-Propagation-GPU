@@ -5,7 +5,7 @@ import time
 
 # Environment for the algorithm
 #------------------------------------------------|
-N = 2048
+N = 4096
 NEG_MAX = np.finfo('float32').min
 CONVITS = 100
 MAXITS = 1000
@@ -104,7 +104,106 @@ while not converged_cpu and i < MAXITS:
 kernel_time = float(time.time()-start_ker)
 print "Number of clusters: ", np.sum(E_cpu)
 print "Exemplars:\n", np.argwhere(E_cpu)
-program_time = float(time.time()-start_prog)
 
-print "Kernel time: ", kernel_time
-print "Program time: ", program_time
+E = E_cpu
+s = sim_cpu
+p = s[0,0]*np.ones(N, np.float32)
+# Identify exemplars
+# for j in range(N):
+#     E[j] = (A[j,j] + R[j,j]) > 0
+K = np.sum(E).astype(np.int32)
+if K>0:
+    tmpidx=np.zeros(N, np.float32)
+    tmpidx[np.argwhere(E)] = np.argwhere(E) # store index of exemplar as itself
+    for j in np.argwhere(E==0).flatten(): # for non-exemplars
+        ss = s[j,:] # get similarity for non-exemplars
+        ii = np.arange(N).astype(np.int32) # 0 to N-1
+        ee = np.argwhere(E[ii]) # indices of exemplars
+        #smx = np.max(ss[ee])
+        imx = np.argmax(ss[ee]) # find the exemplar that jth point belongs to
+        tmpidx[j] = ii[ee[imx]] # store the index of that exemplar
+    EE = np.zeros(N, np.float32)
+    for j in np.argwhere(E).flatten(): # for exemplars
+        jj = np.argwhere(tmpidx==j).flatten() # jj contains all points in a cluster
+        mx = float('-Inf')
+        ns = np.zeros(N, np.float32)
+        msk = np.zeros(N, np.float32)
+        for m in jj: # for all points in cluster
+            mm = np.arange(N).astype(np.int32) # 0 to N-1
+            msk[mm] += 1 # Equals number of points in cluster
+            ns[mm] += s[m,:] # Net similarity to each point in the cluster
+        ii = jj[np.argwhere(msk[jj] == np.size(jj))] # ii equals the cluster (=jj)
+        #smx = np.max(ns[ii])
+        imx = np.argmax(ns[ii]) # find max net similarity in cluster
+        EE[ii[imx]] = 1 # Set EE at point with max net similarity to 1
+    E = EE # Make E contain the few new candidate exemplars
+    tmpidx = np.zeros(N, np.float32)
+    tmpdpsim = 0
+    tmpidx[np.argwhere(E)] = np.argwhere(E) # store indices of the new exemplars
+    tmpexpref = np.sum(p[np.argwhere(E)]) # sum of preferences at exemplars (= preference * # of exemplars)
+    for j in np.argwhere(E==0).flatten(): # for non-exemplars
+        ss = s[j,:] # get similarities
+        ii = np.arange(N).astype(np.int32)
+        ee = np.argwhere(E[ii]) # indices of exemplars
+        smx = np.max(ss[ee]) # find greatest similarity to current point
+        imx = np.argmax(ss[ee]) # get index of that point
+        tmpidx[j] = ii[ee[imx]] # store the index of that point
+        tmpdpsim += smx # sum of max similarities to non-exemplars
+    tmpnetsim = tmpdpsim + tmpexpref # net similarity is max similarities + sum of preferences
+else:
+    tmpidx = float('nan')*np.ones(N)
+    tmpnetsim = float('nan')
+    tmpexpref = float('nan')
+
+netsim = tmpnetsim
+dpsim = tmpnetsim - tmpexpref
+expref = tmpexpref
+idx = tmpidx
+
+program_time = float(time.time() - start_prog)
+PLT = True
+
+
+if PLT:
+    print '\nNumber of identified clusters: %d\n' % K
+    print 'Fitness (net similarity): %f\n' % tmpnetsim
+    print '  Similarities of data points to exemplars: %f\n' % dpsim
+    print '  Preferences of selected exemplars: %f\n' % tmpexpref
+    print 'Number of iterations: %d\n' % i
+    print 'Time taken for entire Python program: %f\n' % program_time
+    print 'Time taken for parallelized portion: %f\n\n' % kernel_time
+if not converged_cpu:
+    print '\n*** Warning: Algorithm did not converge. The similarities\n'
+    print '    may contain degeneracies - add noise to the similarities\n'
+    print '    to remove degeneracies. To monitor the net similarity,\n'
+    print '    activate plotting. Also, consider increasing maxits and\n'
+    print '    if necessary dampfact.\n\n'
+
+# Plot figure showing data and the clusters to compare with Matlab
+if PLT:
+    import matplotlib as mpl
+    #For tesseract server:
+    #mpl.use('agg')
+    #For Bash on Windows & XLaunch:
+    mpl.use('TkAgg')
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure().gca(projection='3d')
+    for i in np.unique(idx):
+        ii = np.argwhere(idx == i)
+        h = fig.scatter(xi[ii], yi[ii], zs=zi[ii])
+        plt.hold(True)
+        col = np.tile(np.random.rand(1,3), (np.size(ii), 1))
+        plt.setp(h, color=col, facecolor=col)
+        for j in ii:
+            fig.plot(np.hstack((xi[j], xi[int(i)])),
+                     np.hstack((yi[j], yi[int(i)])),
+                     zs=np.hstack((zi[j], zi[int(i)])),
+                     color=col[0,:])
+        fig.set_xlabel('x')
+        fig.set_ylabel('y')
+        fig.set_zlabel('z')
+        plt.draw()
+    plt.axis('image')
+    plt.show(block=True)
+    # Grid and 3D rotation w/ mouse enabled by default
