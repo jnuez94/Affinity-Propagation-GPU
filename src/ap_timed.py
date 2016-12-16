@@ -25,7 +25,6 @@ start_prg = time.time()
 # Read point cloud
 data = np.array(ut.readPointCloud('../data/data.xyz', N))
 # Generate similarity matrix
-start_ker = time.time()
 start_sim = time.time()
 s = np.zeros((N,N), np.float32)
 for i in range(N):
@@ -55,6 +54,7 @@ i = 0
 resp_times = []
 avail_times = []
 conv_times = []
+start_mp = time.time()
 while not dn:
     i += 1
 
@@ -98,7 +98,7 @@ while not dn:
             dn=1
     conv_times.append(float(time.time()-start_conv))
 
-kernel_time = float(time.time()-start_ker)
+mp_time = float(time.time()-start_mp)
 resp_time = np.mean(resp_times)
 avail_time = np.mean(avail_times)
 conv_time = np.mean(conv_times)
@@ -165,7 +165,7 @@ if PLT:
     print '  Preferences of selected exemplars: %f\n' % tmpexpref
     print 'Number of iterations: %d\n' % i
     print 'Time taken for entire Python program: %f\n' % program_time
-    print 'Time taken for parallelized portion: %f\n' % kernel_time
+    print 'Time taken for message passing: %f\n' % mp_time
     print 'Average time of responsibility update: %f\n' % resp_time
     print 'Average time of availability update: %f\n' % avail_time
     print 'Average time of convergence check: %f\n\n' % conv_time
