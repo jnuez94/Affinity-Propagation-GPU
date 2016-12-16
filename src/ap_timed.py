@@ -166,6 +166,8 @@ if PLT:
     print 'Number of iterations: %d\n' % i
     print 'Time taken for entire Python program: %f\n' % program_time
     print 'Time taken for message passing: %f\n' % mp_time
+    print 'Time taken for similarity calculation: %f\n' % sim_time
+    print 'Time taken for preference calculation %f\n' % pref_time
     print 'Average time of responsibility update: %f\n' % resp_time
     print 'Average time of availability update: %f\n' % avail_time
     print 'Average time of convergence check: %f\n\n' % conv_time
