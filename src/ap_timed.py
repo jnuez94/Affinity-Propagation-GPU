@@ -9,7 +9,7 @@ utility.py reads data and generates float32 numpy array of coordinates
 Square similarity matrix is generated here
 """
 # PARAMETERS
-N = 2048
+N = 1024
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
@@ -26,17 +26,21 @@ start_prg = time.time()
 data = np.array(ut.readPointCloud('../data/data.xyz', N))
 # Generate similarity matrix
 start_ker = time.time()
+start_sim = time.time()
 s = np.zeros((N,N), np.float32)
 for i in range(N):
     for j in range(N):
         s[i,j] = -np.sum(np.square(data[:,i] - data[:,j]))
+sim_time = float(time.time()-start_sim)
 # Set preference to median similarity
+start_pref = time.time()
 p = np.mean(s).astype(np.float32)
 # Update diagonal of sparse matrix with preference
 for i in range(N):
     s[i,i] = p
 # Make vector of preferences
 p = p*np.ones(N, np.float32)
+pref_time = float(time.time()-start_pref)
 
 # Allocate space for messages
 A = np.zeros((N,N), np.float32)
@@ -47,10 +51,15 @@ E = np.zeros(N, np.int32)
 e = np.zeros((CONVITS, N), np.int32)
 dn = 0
 i = 0
+# Initialize timers
+resp_times = []
+avail_times = []
+conv_times = []
 while not dn:
     i += 1
 
     # Compute responsibilities
+    start_resp = time.time()
     for j in range(N): #looping over i
         ss = s[j,:] # get all s(i,k)
         a_s = A[j,:] + ss # compute a(i,k) + s(i,k)
@@ -62,8 +71,10 @@ while not dn:
         r = ss - Y # do s(i,k) - max(a+s)
         r[I] = ss[I] - Y2 # replace w/ s(i,k) - max(a(i,k')+s(i,k')), k'!=k if max(a+s) was at (i,k)
         R[j,:] = (1-DAMPFACT) * r + DAMPFACT * R[j,:]  # dampen
+    resp_times.append(float(time.time()-start_resp))
 
     # Compute availabilities
+    start_avail = time.time()
     for j in range(N): #looping over k
         rp = np.maximum(R[:,j], 0) # elementwise maximum of r transposed
         rp[j] = R[j,j] # replace r(k,k) which is not subject to max
@@ -72,8 +83,10 @@ while not dn:
         a = np.minimum(a, 0) # elementwise minimum for a(i,k)
         a[j] = dA # replace a(k,k)
         A[:,j] = (1-DAMPFACT) * a + DAMPFACT * A[:,j] # dampen
+    avail_times.append(float(time.time()-start_avail))
 
     # Check for convergence
+    start_conv = time.time()
     for j in range(N):
         E[j] = (A[j,j] + R[j,j]) > 0 # Find where A(i,i)+R(i,i) is > 0 (i.e. find the exemplars)
     e[(i-1) % CONVITS , :] = E # Buffer for convergence iterations
@@ -83,9 +96,13 @@ while not dn:
         unconverged = np.sum((se==CONVITS) + (se==0)) != N # Unconverged if # of exemplars isn't same for CONVITS
         if (not unconverged and K>0) or (i==MAXITS): # Stop the message passing loop
             dn=1
+    conv_times.append(float(time.time()-start_conv))
 
 kernel_time = float(time.time()-start_ker)
-print np.argwhere(E)
+resp_time = np.mean(resp_times)
+avail_time = np.mean(avail_times)
+conv_time = np.mean(conv_times)
+print 'Cluster indices:', np.argwhere(E).flatten()
 
 # Identify exemplars
 for j in range(N):
@@ -148,7 +165,10 @@ if PLT:
     print '  Preferences of selected exemplars: %f\n' % tmpexpref
     print 'Number of iterations: %d\n' % i
     print 'Time taken for entire Python program: %f\n' % program_time
-    print 'Time taken for parallelized portion: %f\n\n' % kernel_time
+    print 'Time taken for parallelized portion: %f\n' % kernel_time
+    print 'Average time of responsibility update: %f\n' % resp_time
+    print 'Average time of availability update: %f\n' % avail_time
+    print 'Average time of convergence check: %f\n\n' % conv_time
 if unconverged:
     print '\n*** Warning: Algorithm did not converge. The similarities\n'
     print '    may contain degeneracies - add noise to the similarities\n'
