@@ -5,7 +5,7 @@ import time
 
 # Environment for the algorithm
 #------------------------------------------------|
-N = 4096
+N = 1024
 NEG_MAX = np.finfo('float32').min
 CONVITS = 100
 MAXITS = 1000
@@ -42,17 +42,22 @@ print "len(x): ", N
 
 block_dim = 32
 grid_dim = int(np.ceil(N/block_dim))
+
+start_similarity = time.time() 										# Similarity timing
 similarity(x_gpu, y_gpu, z_gpu, sim_gpu,
 	grid=(grid_dim, grid_dim, 1),
 	block=(block_dim, block_dim,1))
 sim_cpu = sim_gpu.get()
+similarity_time = float(time.time()-start_similarity) 		# End of Sim timing
 
 # Calculate preference
 #-----------------------------------
+start_pref = time.time()
 preference(sim_gpu,
 	grid=(1,1,1),
 	block=(1024,1,1))
 sim_cpu = sim_gpu.get()
+pref_time = float(time.time()-start_pref)
 #-----------------------------------
 
 # Message passing procedure
@@ -68,16 +73,24 @@ se_gpu = ker.gpuarray.zeros(N, np.uint32)
 converged_gpu = ker.gpuarray.zeros(1, np.bool)
 converged_cpu = False
 
+resp_time = []
+avail_time = []
+conv_time = []
+
+start_msgpassing = time.time()
 while not converged_cpu and i < MAXITS:
 	i += 1
 
 	S_gpu = ker.gpuarray.to_gpu(sim_cpu)
 	A_gpu = ker.gpuarray.to_gpu(A_cpu) # A inherently transposed
 	R_gpu = ker.gpuarray.to_gpu(R_cpu)
-	
+
+	start_resp = time.time()	
 	responsibilities(S_gpu, R_gpu, A_gpu, AS_gpu,
 		grid=(N,1,1),
 		block=(1024,1,1))
+	resp_time.append(float(time.time()-start_resp))
+
 	R_cpu = R_gpu.get()
 
 	_A = A_cpu.T.copy()
@@ -87,20 +100,29 @@ while not converged_cpu and i < MAXITS:
 	R_gpu = ker.gpuarray.to_gpu(_R)
 
 	iteration = 0
+
+	start_avail = time.time()
 	availabilities(A_gpu, R_gpu, RP_gpu, np.int32(iteration),
 		grid=(N,1,1),
 		block=(1024,1,1))
+	avail_time.append(float(time.time()-start_avail))
+
 	A_cpu = A_gpu.get().T.copy()
 
 	E_gpu = ker.gpuarray.to_gpu(E_cpu)
 	A_gpu = ker.gpuarray.to_gpu(np.diag(A_cpu))
 	R_gpu = ker.gpuarray.to_gpu(np.diag(R_cpu))
 
+	start_conv = time.time()
 	convergence(A_gpu, R_gpu, E_gpu, e_gpu, se_gpu, np.int32(i), converged_gpu,
 		grid = (1,1,1),
 		block = (1024,1,1))
+	conv_time.append(float(time.time()-start_conv))
+
 	E_cpu = E_gpu.get()
 	converged_cpu = converged_gpu.get()
+
+msgpassing_time = float(time.time()-start_msgpassing)
 kernel_time = float(time.time()-start_ker)
 print "Number of clusters: ", np.sum(E_cpu)
 print "Exemplars:\n", np.argwhere(E_cpu)
@@ -172,6 +194,12 @@ if PLT:
     print 'Number of iterations: %d\n' % i
     print 'Time taken for entire Python program: %f\n' % program_time
     print 'Time taken for parallelized portion: %f\n\n' % kernel_time
+    print 'Time taken for similarity kernel: %f\n\n' % similarity_time
+    print 'Time taken for preference kernel: %f\n\n' % pref_time
+    print 'Time taken for message passing: %f\n\n' % msgpassing_time
+    print 'Average time taken for responsibility kernel: %f\n\n' % np.mean(resp_time)
+    print 'Average time taken for availability kernel: %f\n\n' % np.mean(avail_time)
+    print 'Average time taken for convergence kernel: %f\n\n' % np.mean(conv_time)
 if not converged_cpu:
     print '\n*** Warning: Algorithm did not converge. The similarities\n'
     print '    may contain degeneracies - add noise to the similarities\n'
