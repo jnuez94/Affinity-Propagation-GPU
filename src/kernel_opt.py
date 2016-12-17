@@ -20,7 +20,7 @@ __device__ float atomicMaxf(float* address, float val) {
 	return __int_as_float(old);
 }
 
-__global__ void similarity(float* x, float* y, float* z, float* s) {
+__global__ void similarity(float* x, float* y, float* z, float* s) { //DON'T CHANGE
 
 	unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
 	unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
@@ -41,7 +41,7 @@ __global__ void similarity(float* x, float* y, float* z, float* s) {
 
 // Calculate the preference with a single block, 1024 threads
 // Should be median but this is a mean
-__global__ void preference(float* S) {
+__global__ void preference(float* S) { //DON'T CHANGE
 	unsigned int i;
     unsigned int j;
     unsigned int k;
@@ -68,7 +68,7 @@ __global__ void preference(float* S) {
 }
 
 // Calculate responsibilities
-__global__ void responsibilities(float* S, float* R, float* A, float *AS) {
+__global__ void responsibilities(float* S, float* R, float* A, float *AS) { //TODO: CHANGE ACCESS FROM A AS COLUMN-WISE
 	unsigned int i;
 	unsigned int j;
 	float temp;
@@ -121,7 +121,7 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) {
 }
 
 // Calculate availabilities
-__global__ void availabilities(float* A, float* R, float* RP, unsigned int iteration) {
+__global__ void availabilities(float* A, float* R, float* RP, unsigned int iteration) { //CHANGE ACCESS FROM R AS COLUMN-WISE
 	unsigned int i;
 	unsigned int j;
 	unsigned int diag = (iteration*gridDim.x+blockIdx.x)*(%(N)s+1);
@@ -164,7 +164,7 @@ __global__ void availabilities(float* A, float* R, float* RP, unsigned int itera
 // Note the converged flag only tells CPU to stop iterating.
 // CPU will not call this if MAXITS hit, so maxits checks are removed
 __global__ void convergence(float* A, float* R, bool* E, unsigned int* e,
- 	unsigned int* se, unsigned int iteration, bool* converged) {
+ 	unsigned int* se, unsigned int iteration, bool* converged) { //TODO: UPDATE INDEXING OF A & R TO DIAGONAL. SEE PREFERENCE KERNEL.
 	unsigned int i;
 	unsigned int j;
 	unsigned int k;
