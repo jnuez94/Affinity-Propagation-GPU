@@ -2,7 +2,9 @@ import kernel_opt as ker
 import utility as ut
 import numpy as np
 
-x, y, z = ut.readPointCloud('./data/short.xyz')
+N = 1024
+
+x, y, z = ut.readPointCloud('./data/data.xyz', N)
 xi = np.copy(x).astype(np.float32)
 yi = np.copy(y).astype(np.float32)
 zi = np.copy(z).astype(np.float32)
@@ -10,7 +12,6 @@ zi = np.copy(z).astype(np.float32)
 x_gpu = ker.gpuarray.to_gpu(xi)
 y_gpu = ker.gpuarray.to_gpu(yi)
 z_gpu = ker.gpuarray.to_gpu(zi)
-N = len(x)
 S_gpu = ker.gpuarray.zeros((N,N), np.float32)
 print "len(x): ", N
 print "shape: ", S_gpu.shape
@@ -18,11 +19,11 @@ print "shape: ", np.copy(S_gpu.get()).astype(np.float32).shape
 sim = ut.pysimilarity(x,y,z)
 
 block_dim = 32
-grid_dim = N/block_dim + 1
+grid_dim = int(np.ceil(N/block_dim))
 ker.similarity(x_gpu, y_gpu, z_gpu, S_gpu,
 	grid=(grid_dim, grid_dim, 1),
 	block=(block_dim, block_dim,1))
-#sim_cpu = S_gpu.get()
+sim_cpu = S_gpu.get()
 # print(sim_cpu)
 print "S Validation: ", np.allclose(sim, sim_cpu)
 
@@ -161,8 +162,8 @@ while not converged_cpu and i < MAXITS:
 	converged_cpu = converged_gpu.get()
 
 	print('\n')
-
-print E_cpu = E_gpu.get()
+E_cpu = E_gpu.get()
+print E_cpu
 print E
 print "E Validation", np.allclose(E, E_cpu)
 print dn, converged_cpu
