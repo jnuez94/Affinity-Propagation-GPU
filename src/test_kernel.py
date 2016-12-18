@@ -1,8 +1,10 @@
-import kernel as ker
+import kernel_opt as ker
 import utility as ut
 import numpy as np
 
-x, y, z = ut.readPointCloud('./data/short.xyz')
+N = 1024
+
+x, y, z = ut.readPointCloud('./data/data.xyz', N)
 xi = np.copy(x).astype(np.float32)
 yi = np.copy(y).astype(np.float32)
 zi = np.copy(z).astype(np.float32)
@@ -10,26 +12,25 @@ zi = np.copy(z).astype(np.float32)
 x_gpu = ker.gpuarray.to_gpu(xi)
 y_gpu = ker.gpuarray.to_gpu(yi)
 z_gpu = ker.gpuarray.to_gpu(zi)
-N = len(x)
-sim_gpu = ker.gpuarray.zeros((N,N), np.float32)
+S_gpu = ker.gpuarray.zeros((N,N), np.float32)
 print "len(x): ", N
-print "shape: ", sim_gpu.shape
-print "shape: ", np.copy(sim_gpu.get()).astype(np.float32).shape
+print "shape: ", S_gpu.shape
+print "shape: ", np.copy(S_gpu.get()).astype(np.float32).shape
 sim = ut.pysimilarity(x,y,z)
 
 block_dim = 32
-grid_dim = N/block_dim + 1
-ker.similarity(x_gpu, y_gpu, z_gpu, sim_gpu,
+grid_dim = int(np.ceil(N/block_dim))
+ker.similarity(x_gpu, y_gpu, z_gpu, S_gpu,
 	grid=(grid_dim, grid_dim, 1),
 	block=(block_dim, block_dim,1))
-sim_cpu = sim_gpu.get()
+sim_cpu = S_gpu.get()
 # print(sim_cpu)
 print "S Validation: ", np.allclose(sim, sim_cpu)
 
-ker.preference(sim_gpu,
+ker.preference(S_gpu,
 	grid=(1,1,1),
 	block=(1024,1,1))
-sim_cpu = sim_gpu.get()
+sim_cpu = S_gpu.get()
 # print(sim_cpu)
 # CPU update preference
 pref = np.mean(sim)
@@ -62,13 +63,17 @@ se_gpu = ker.gpuarray.zeros(N, np.uint32)
 converged_gpu = ker.gpuarray.zeros(1, np.bool)
 converged_cpu = False;
 
+A_gpu = ker.gpuarray.to_gpu(A_cpu)
+R_gpu = ker.gpuarray.to_gpu(R_cpu)
+E_gpu = ker.gpuarray.to_gpu(E_cpu)
+
 while not converged_cpu and i < MAXITS:
 	i += 1
 
 	# TEST RESPONSIBILITY KERNEL
-	S_gpu = ker.gpuarray.to_gpu(sim_cpu)
-	A_gpu = ker.gpuarray.to_gpu(A_cpu) # A inherently transposed
-	R_gpu = ker.gpuarray.to_gpu(R_cpu)
+	#S_gpu = ker.gpuarray.to_gpu(sim_cpu)
+	#A_gpu = ker.gpuarray.to_gpu(A_cpu) # A inherently transposed
+	#R_gpu = ker.gpuarray.to_gpu(R_cpu)
 
 	print "Iteration: ", i
 
@@ -102,11 +107,11 @@ while not converged_cpu and i < MAXITS:
 	#print A[j,:]
 
 	# TEST AVAILABILITY KERNEL
-	_A = A_cpu.T.copy()
-	_R = R_cpu.T.copy()
+	#_A = A_cpu.T.copy()
+	#_R = R_cpu.T.copy()
 	# print "RT col: \n",_R[:,0]
-	A_gpu = ker.gpuarray.to_gpu(_A)
-	R_gpu = ker.gpuarray.to_gpu(_R)
+	#A_gpu = ker.gpuarray.to_gpu(_A)
+	#R_gpu = ker.gpuarray.to_gpu(_R)
 	# print "RTgpu col: \n", R_gpu.get()[:,0]
 
 	#CPU
@@ -134,9 +139,9 @@ while not converged_cpu and i < MAXITS:
 	print "A Validation: ", np.allclose(A, A_cpu)
 
 	# TEST CONVERGENCE KERNEL
-	E_gpu = ker.gpuarray.to_gpu(E_cpu)
-	A_gpu = ker.gpuarray.to_gpu(np.diag(A_cpu))
-	R_gpu = ker.gpuarray.to_gpu(np.diag(R_cpu))
+	
+	#A_gpu = ker.gpuarray.to_gpu(np.diag(A_cpu))
+	#R_gpu = ker.gpuarray.to_gpu(np.diag(R_cpu))
 
 	#CPU
 	for j in range(N):
@@ -153,11 +158,11 @@ while not converged_cpu and i < MAXITS:
 	ker.convergence(A_gpu, R_gpu, E_gpu, e_gpu, se_gpu, np.int32(i), converged_gpu,
 		grid = (1,1,1),
 		block = (N,1,1))
-	E_cpu = E_gpu.get()
+	#E_cpu 
 	converged_cpu = converged_gpu.get()
 
 	print('\n')
-
+E_cpu = E_gpu.get()
 print E_cpu
 print E
 print "E Validation", np.allclose(E, E_cpu)

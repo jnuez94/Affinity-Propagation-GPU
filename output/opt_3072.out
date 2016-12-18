@@ -1,0 +1,53 @@
+The Current Working Directory : /home/jn2548/workspace/Affinity-Propagation-GPU
+Submitted batch job 63004
+
+len(x):  3072
+Number of clusters:  12
+Exemplars:
+[[ 486]
+ [ 503]
+ [ 607]
+ [1075]
+ [1332]
+ [1736]
+ [1840]
+ [2129]
+ [2417]
+ [2666]
+ [2903]
+ [2981]]
+
+Number of identified clusters: 12
+
+Fitness (net similarity): -32144.601532
+
+  Similarities of data points to exemplars: -12164.763642
+
+  Preferences of selected exemplars: -19979.837891
+
+Number of iterations: 144
+
+Time taken for entire Python program: 4.399546
+
+Time taken for parallelized portion: 3.839288
+
+
+Time taken for similarity kernel: 0.000173
+
+
+Time taken for preference kernel: 0.000071
+
+
+Time taken for message passing: 3.410778
+
+
+Average time taken for responsibility kernel: 0.000103
+
+
+Average time taken for availability kernel: 0.000074
+
+
+Average time taken for convergence kernel: 0.000112
+
+
+

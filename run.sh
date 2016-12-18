@@ -2,7 +2,7 @@
 var=$(pwd)
 echo "The Current Working Directory : $var"
 find . -name "slurm-*.out" -exec rm {} \;
-sbatch --gres=gpu:1 --wrap="/opt/PYTHON/bin/python $var/$1" --time 1;
+sbatch --gres=gpu:1 --wrap="/opt/PYTHON/bin/python $var/$1" --time 10;
 while  [ true ]
   do
         if ls slurm-* > /dev/null 2>&1
