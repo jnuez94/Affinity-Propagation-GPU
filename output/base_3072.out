@@ -1,0 +1,50 @@
+len(x):  3072
+Number of clusters:  12
+Exemplars:
+[[ 486]
+ [ 503]
+ [ 607]
+ [1075]
+ [1332]
+ [1736]
+ [1840]
+ [2129]
+ [2417]
+ [2666]
+ [2903]
+ [2981]]
+
+Number of identified clusters: 12
+
+Fitness (net similarity): -32144.601532
+
+  Similarities of data points to exemplars: -12164.763642
+
+  Preferences of selected exemplars: -19979.837891
+
+Number of iterations: 144
+
+Time taken for entire Python program: 93.558406
+
+Time taken for parallelized portion: 92.014615
+
+
+Time taken for similarity kernel: 0.026115
+
+
+Time taken for preference kernel: 0.027277
+
+
+Time taken for message passing: 91.530931
+
+
+Average time taken for responsibility kernel: 0.000256
+
+
+Average time taken for availability kernel: 0.000274
+
+
+Average time taken for convergence kernel: 0.000222
+
+
+

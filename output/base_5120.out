@@ -1,0 +1,71 @@
+The Current Working Directory : /home/jn2548/workspace/Affinity-Propagation-GPU
+Submitted batch job 62485
+
+len(x):  5120
+Number of clusters:  18
+Exemplars:
+[[ 324]
+ [ 439]
+ [1117]
+ [1355]
+ [1706]
+ [1748]
+ [2074]
+ [2417]
+ [2693]
+ [2981]
+ [3175]
+ [3327]
+ [3527]
+ [3733]
+ [4153]
+ [4343]
+ [4803]
+ [4907]]
+
+Number of identified clusters: 18
+
+Fitness (net similarity): -50849.237225
+
+  Similarities of data points to exemplars: -22684.602460
+
+  Preferences of selected exemplars: -28164.634766
+
+Number of iterations: 155
+
+Time taken for entire Python program: 287.314756
+
+Time taken for parallelized portion: 283.330937
+
+
+Time taken for similarity kernel: 0.068927
+
+
+Time taken for preference kernel: 0.075426
+
+
+Time taken for message passing: 282.749134
+
+
+Average time taken for responsibility kernel: 0.000231
+
+
+Average time taken for availability kernel: 0.000244
+
+
+Average time taken for convergence kernel: 0.000215
+
+
+Traceback (most recent call last):
+  File "/home/jn2548/workspace/Affinity-Propagation-GPU/src/main.py", line 236, in <module>
+    plt.show(block=True)
+  File "/opt/PYTHON/lib/python2.7/site-packages/matplotlib/pyplot.py", line 252, in show
+    return _show(*args, **kw)
+  File "/opt/PYTHON/lib/python2.7/site-packages/matplotlib/backend_bases.py", line 166, in __call__
+    self.mainloop()
+  File "/opt/PYTHON/lib/python2.7/site-packages/matplotlib/backends/backend_tkagg.py", line 74, in mainloop
+    Tk.mainloop()
+  File "/opt/PYTHON/lib/python2.7/lib-tk/Tkinter.py", line 414, in mainloop
+    _default_root.tk.mainloop(n)
+AttributeError: 'NoneType' object has no attribute 'tk'
+

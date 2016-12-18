@@ -134,6 +134,7 @@ p = s[0,0]*np.ones(N, np.float32)
 # for j in range(N):
 #     E[j] = (A[j,j] + R[j,j]) > 0
 K = np.sum(E).astype(np.int32)
+program_time = float(time.time() - start_prog)
 if K>0:
     tmpidx=np.zeros(N, np.float32)
     tmpidx[np.argwhere(E)] = np.argwhere(E) # store index of exemplar as itself
@@ -182,7 +183,6 @@ dpsim = tmpnetsim - tmpexpref
 expref = tmpexpref
 idx = tmpidx
 
-program_time = float(time.time() - start_prog)
 PLT = True
 
 
