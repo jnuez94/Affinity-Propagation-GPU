@@ -85,7 +85,7 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) { //TO
 	// AS = A + S
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
-		temp = A[j] + S[j];
+		temp = A[(i+threadIdx.x)*%(N)s+blockIdx.x] + S[j];
 		AS[j] = temp;
 		pmax[0] = (pmax[0] >= temp)*pmax[0] + (pmax[0] < temp)*temp;
 	}
@@ -138,7 +138,7 @@ __global__ void availabilities(float* A, float* R, float* RP, unsigned int itera
 	// Get elementwise maximum of R and calculate sum
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = blk_os + i + threadIdx.x;
-		rp = R[j];
+		rp = R[(i+threadIdx.x)*%(N)s+blockIdx.x];
 		if (rp < 0.0 && j != diag)
 			rp = 0.0;
 		RP[j] = rp;
@@ -183,7 +183,7 @@ __global__ void convergence(float* A, float* R, bool* E, unsigned int* e,
 	// E is bool vector of whether diagonal (A+R) > 0
 	for (i=0; i<%(N)s; i+=blockDim.x) {
 		j = i + threadIdx.x;
-		E_priv = (A[j] + R[j]) > 0;
+		E_priv = (A[j*(%(N)s + 1)] + R[j*(%(N)s + 1)]) > 0;
 		e[((iteration-1) %% %(CONVITS)s)*%(N)s + j] = E_priv;
 		E[j] = E_priv;
 		atomicAdd(&K[0], E_priv);
