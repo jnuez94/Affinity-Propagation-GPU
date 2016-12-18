@@ -9,7 +9,7 @@ utility.py reads data and generates float32 numpy array of coordinates
 Square similarity matrix is generated here
 """
 # PARAMETERS
-N = 1024
+N = 6144
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
@@ -108,6 +108,9 @@ print 'Cluster indices:', np.argwhere(E).flatten()
 for j in range(N):
     E[j] = (A[j,j] + R[j,j]) > 0
 K = np.sum(E).astype(np.int32)
+
+program_time = float(time.time()-start_prg)
+
 if K>0:
     tmpidx=np.zeros(N, np.float32)
     tmpidx[np.argwhere(E)] = np.argwhere(E) # store index of exemplar as itself
@@ -156,7 +159,7 @@ dpsim = tmpnetsim - tmpexpref
 expref = tmpexpref
 idx = tmpidx
 
-program_time = float(time.time() - start_prg)
+#program_time = float(time.time() - start_prg)
 
 if PLT:
     print '\nNumber of identified clusters: %d\n' % K
