@@ -9,7 +9,7 @@ utility.py reads data and generates float32 numpy array of coordinates
 Square similarity matrix is generated here
 """
 # PARAMETERS
-N = 6144
+N = 1024
 MAXITS = 1000 # maximum iterations. Default = 1000
 CONVITS = 100 # converged if est. centers stay fixed for convits iterations. Default = 100
 DAMPFACT = 0.9 # 0.5 to 1, damping. Higher needed if oscillations occur. Default = 0.9.
