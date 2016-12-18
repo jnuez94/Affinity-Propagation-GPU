@@ -121,10 +121,10 @@ __global__ void responsibilities(float* S, float* R, float* A, float *AS) { //TO
 }
 
 // Calculate availabilities
-__global__ void availabilities(float* A, float* R, float* RP, unsigned int iteration) { //CHANGE ACCESS FROM R AS COLUMN-WISE
+__global__ void availabilities(float* A, float* R, float* RP) { //CHANGE ACCESS FROM R AS COLUMN-WISE
 	unsigned int i;
 	unsigned int j;
-	unsigned int diag = (iteration*gridDim.x+blockIdx.x)*(%(N)s+1);
+	unsigned int diag = blockIdx.x*(%(N)s+1);
 	float rp;
 	float a;
 	float a_old;

@@ -1,4 +1,4 @@
-import kernel as ker
+import kernel_opt as ker
 import utility as ut
 import numpy as np
 import time
@@ -37,37 +37,35 @@ start_ker = time.time()
 x_gpu = ker.gpuarray.to_gpu(xi)
 y_gpu = ker.gpuarray.to_gpu(yi)
 z_gpu = ker.gpuarray.to_gpu(zi)
-sim_gpu = ker.gpuarray.zeros((N,N), np.float32)
+S_gpu = ker.gpuarray.zeros((N,N), np.float32)
 print "len(x): ", N
 
 block_dim = 32
 grid_dim = int(np.ceil(N/block_dim))
 
 start_similarity = time.time() 										# Similarity timing
-similarity(x_gpu, y_gpu, z_gpu, sim_gpu,
+similarity(x_gpu, y_gpu, z_gpu, S_gpu,
 	grid=(grid_dim, grid_dim, 1),
 	block=(block_dim, block_dim,1))
-sim_cpu = sim_gpu.get() # TODO: DON'T NEED TO DO THIS
 similarity_time = float(time.time()-start_similarity) 		# End of Sim timing
 
 # Calculate preference
 #-----------------------------------
 start_pref = time.time()
-preference(sim_gpu,
+preference(S_gpu,
 	grid=(1,1,1),
 	block=(1024,1,1))
-sim_cpu = sim_gpu.get() # TODO: DON'T NEED TO DO THIS
 pref_time = float(time.time()-start_pref)
 #-----------------------------------
 
 # Message passing procedure
 #---------------------------------------------
 i = 0
-A_cpu = np.zeros((N,N), np.float32)
-R_cpu = np.zeros((N,N), np.float32)
+A_gpu = ker.gpuarray.zeros((N,N), np.float32)
+R_gpu = ker.gpuarray.zeros((N,N), np.float32)
 AS_gpu = ker.gpuarray.zeros((N,N), np.float32)
 RP_gpu = ker.gpuarray.zeros((N,N), np.float32)
-E_cpu = np.zeros(N, np.bool)
+E_gpu = ker.gpuarray.zeros(N, np.bool)
 e_gpu = ker.gpuarray.zeros((CONVITS, N), np.uint32)
 se_gpu = ker.gpuarray.zeros(N, np.uint32)
 converged_gpu = ker.gpuarray.zeros(1, np.bool)
@@ -81,40 +79,17 @@ start_msgpassing = time.time()
 while not converged_cpu and i < MAXITS:
 	i += 1
 
-	S_gpu = ker.gpuarray.to_gpu(sim_cpu) # TODO: THIS IS ALREADY IN THE GPU
-	A_gpu = ker.gpuarray.to_gpu(A_cpu) # A inherently transposed # TODO: THIS IS ALREADY IN THE GPU
-	R_gpu = ker.gpuarray.to_gpu(R_cpu) # TODO: THIS IS ALREADY IN THE GPU
-
 	start_resp = time.time()
 	responsibilities(S_gpu, R_gpu, A_gpu, AS_gpu,
 		grid=(N,1,1),
 		block=(1024,1,1))
 	resp_time.append(float(time.time()-start_resp))
-	"""
-	TODO:
-	DON'T GET THE DATA FROM GPU AND TRANSPOSE, JUST ACCESS THE DATA COLUMN-WISE IN AVAILABILITY KERNEL
-	"""
-	R_cpu = R_gpu.get()
-
-	_A = A_cpu.T.copy()
-	_R = R_cpu.T.copy()
-
-	A_gpu = ker.gpuarray.to_gpu(_A)
-	R_gpu = ker.gpuarray.to_gpu(_R)
-
-	iteration = 0
 
 	start_avail = time.time()
-	availabilities(A_gpu, R_gpu, RP_gpu, np.int32(iteration),
+	availabilities(A_gpu, R_gpu, RP_gpu,
 		grid=(N,1,1),
 		block=(1024,1,1))
 	avail_time.append(float(time.time()-start_avail))
-
-	A_cpu = A_gpu.get().T.copy() #TODO: DON'T DO THIS
-
-	E_gpu = ker.gpuarray.to_gpu(E_cpu) #TODO: ALREADY DONE
-	A_gpu = ker.gpuarray.to_gpu(np.diag(A_cpu)) #TODO: ALREADY IN GPU
-	R_gpu = ker.gpuarray.to_gpu(np.diag(R_cpu)) #TODO: ALREADY IN GPU
 
 	start_conv = time.time()
 	convergence(A_gpu, R_gpu, E_gpu, e_gpu, se_gpu, np.int32(i), converged_gpu,
@@ -122,15 +97,15 @@ while not converged_cpu and i < MAXITS:
 		block = (1024,1,1))
 	conv_time.append(float(time.time()-start_conv))
 
-	E_cpu = E_gpu.get() #TODO: MOVE E_GPU.GET() TO OUTSIDE AFTER ITERATIONS FINISHED
 	converged_cpu = converged_gpu.get()
+
+E = E_gpu.get()
 
 msgpassing_time = float(time.time()-start_msgpassing)
 kernel_time = float(time.time()-start_ker)
-print "Number of clusters: ", np.sum(E_cpu)
-print "Exemplars:\n", np.argwhere(E_cpu)
+print "Number of clusters: ", np.sum(E)
+print "Exemplars:\n", np.argwhere(E)
 
-E = E_cpu
 s = sim_cpu
 p = s[0,0]*np.ones(N, np.float32)
 # Identify exemplars
